@@ -1,6 +1,8 @@
 import os
 import sqlite3
 import threading
+import hashlib
+import secrets
 from typing import Optional, List, Dict, Any
 import pandas as pd
 from datetime import datetime
@@ -42,11 +44,134 @@ def init_db():
                     [Last Updated] TEXT
                 )
             """)
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS users (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    name TEXT NOT NULL,
+                    username TEXT NOT NULL UNIQUE,
+                    email TEXT NOT NULL UNIQUE,
+                    password_hash TEXT NOT NULL,
+                    salt TEXT NOT NULL,
+                    created_at TEXT NOT NULL
+                )
+            """)
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS sessions (
+                    token TEXT PRIMARY KEY,
+                    user_id INTEGER NOT NULL,
+                    created_at TEXT NOT NULL,
+                    FOREIGN KEY(user_id) REFERENCES users(id)
+                )
+            """)
             conn.commit()
             conn.close()
         except Exception as e:
             print(f"Error initializing DB: {e}")
             raise RuntimeError(f"Database initialization failed: {str(e)}")
+
+def hash_password(password: str, salt: Optional[str] = None) -> tuple:
+    if not salt:
+        salt = secrets.token_hex(16)
+    key = hashlib.pbkdf2_hmac('sha256', password.encode('utf-8'), salt.encode('utf-8'), 100000)
+    return key.hex(), salt
+
+def verify_password(password: str, password_hash: str, salt: str) -> bool:
+    calc_hash, _ = hash_password(password, salt)
+    return secrets.compare_digest(calc_hash, password_hash)
+
+def create_user(name: str, username: str, email: str, password: str) -> dict:
+    name = name.strip()
+    username = username.strip().lower()
+    email = email.strip().lower()
+    
+    if not name or not username or not email or not password:
+        raise ValueError("All fields (Name, username, email address, password) are required.")
+        
+    pwd_hash, salt = hash_password(password)
+    created_at = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    
+    with db_lock:
+        conn = get_connection()
+        cursor = conn.cursor()
+        cursor.execute("SELECT username, email FROM users WHERE username = ? OR email = ?", (username, email))
+        row = cursor.fetchone()
+        if row:
+            conn.close()
+            if row[0] == username:
+                raise ValueError("Username is already taken.")
+            else:
+                raise ValueError("Email address is already registered.")
+                
+        cursor.execute("""
+            INSERT INTO users (name, username, email, password_hash, salt, created_at)
+            VALUES (?, ?, ?, ?, ?, ?)
+        """, (name, username, email, pwd_hash, salt, created_at))
+        user_id = cursor.lastrowid
+        conn.commit()
+        conn.close()
+        
+    return {"id": user_id, "name": name, "username": username, "email": email}
+
+def authenticate_user(username_or_email: str, password: str) -> Optional[dict]:
+    identifier = username_or_email.strip().lower()
+    with db_lock:
+        conn = get_connection()
+        cursor = conn.cursor()
+        cursor.execute("""
+            SELECT id, name, username, email, password_hash, salt
+            FROM users
+            WHERE username = ? OR email = ?
+        """, (identifier, identifier))
+        row = cursor.fetchone()
+        conn.close()
+        
+    if not row:
+        return None
+        
+    user_id, name, username, email, password_hash, salt = row
+    if verify_password(password, password_hash, salt):
+        return {"id": user_id, "name": name, "username": username, "email": email}
+    return None
+
+def create_session(user_id: int) -> str:
+    token = secrets.token_hex(32)
+    created_at = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    with db_lock:
+        conn = get_connection()
+        cursor = conn.cursor()
+        cursor.execute("INSERT INTO sessions (token, user_id, created_at) VALUES (?, ?, ?)", (token, user_id, created_at))
+        conn.commit()
+        conn.close()
+    return token
+
+def get_user_by_token(token: str) -> Optional[dict]:
+    if not token:
+        return None
+    with db_lock:
+        conn = get_connection()
+        cursor = conn.cursor()
+        cursor.execute("""
+            SELECT u.id, u.name, u.username, u.email
+            FROM users u
+            JOIN sessions s ON u.id = s.user_id
+            WHERE s.token = ?
+        """, (token,))
+        row = cursor.fetchone()
+        conn.close()
+        
+    if row:
+        return {"id": row[0], "name": row[1], "username": row[2], "email": row[3]}
+    return None
+
+def delete_session(token: str):
+    if not token:
+        return
+    with db_lock:
+        conn = get_connection()
+        cursor = conn.cursor()
+        cursor.execute("DELETE FROM sessions WHERE token = ?", (token,))
+        conn.commit()
+        conn.close()
 
 def load_from_db() -> Optional[pd.DataFrame]:
     """Loads all diagnostics data from the database as a Pandas DataFrame."""

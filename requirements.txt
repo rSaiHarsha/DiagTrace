@@ -3,3 +3,11 @@ uvicorn[standard]
 pandas
 numpy
 xlsxwriter
+python-dotenv
+requests
+httpx
+openai
+qdrant-client
+pypdf
+python-docx
+python-multipart

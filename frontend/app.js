@@ -9,7 +9,10 @@ let appState = {
     isPolling: false,
     pollIntervalId: null,
     currentExplorerPath: "",
-    activeTab: "server"
+    activeTab: "server",
+    currentUser: null,
+    authToken: localStorage.getItem('diagtrace_token') || null,
+    currentTheme: localStorage.getItem('diagtrace_theme') || 'white'
 };
 
 // Global Chart.js Instances
@@ -55,6 +58,104 @@ const elements = {
     btnPagePrev: document.getElementById('btn-page-prev'),
     pageNumDisplay: document.getElementById('page-num-display'),
     btnPageNext: document.getElementById('btn-page-next'),
+    
+    // Header Navigation Controls
+    btnHeaderProfile: document.getElementById('btn-header-profile'),
+    headerProfileText: document.getElementById('header-profile-text'),
+    btnHeaderSettings: document.getElementById('btn-header-settings'),
+    
+    // Auth Modals & Profile / Settings
+    signinModal: document.getElementById('signin-modal'),
+    signinClose: document.getElementById('signin-close'),
+    signinForm: document.getElementById('signin-form'),
+    signinIdentifier: document.getElementById('signin-identifier'),
+    signinPassword: document.getElementById('signin-password'),
+    signinError: document.getElementById('signin-error'),
+    linkGotoSignup: document.getElementById('link-goto-signup'),
+    
+    signupModal: document.getElementById('signup-modal'),
+    signupClose: document.getElementById('signup-close'),
+    signupForm: document.getElementById('signup-form'),
+    signupName: document.getElementById('signup-name'),
+    signupUsername: document.getElementById('signup-username'),
+    signupEmail: document.getElementById('signup-email'),
+    signupPassword: document.getElementById('signup-password'),
+    signupError: document.getElementById('signup-error'),
+    linkGotoSignin: document.getElementById('link-goto-signin'),
+    
+    profileModal: document.getElementById('profile-modal'),
+    profileClose: document.getElementById('profile-close'),
+    profileUserView: document.getElementById('profile-user-view'),
+    profileGuestView: document.getElementById('profile-guest-view'),
+    profileDisplayName: document.getElementById('profile-display-name'),
+    profileUsername: document.getElementById('profile-username'),
+    profileEmail: document.getElementById('profile-email'),
+    btnProfileSignout: document.getElementById('btn-profile-signout'),
+    btnProfileSignin: document.getElementById('btn-profile-signin'),
+    btnProfileSignup: document.getElementById('btn-profile-signup'),
+    
+    settingsModal: document.getElementById('settings-modal'),
+    settingsClose: document.getElementById('settings-close'),
+    tabBtnTheme: document.getElementById('tab-btn-theme'),
+    tabBtnAi: document.getElementById('tab-btn-ai'),
+    settingsViewTheme: document.getElementById('settings-view-theme'),
+    settingsViewAi: document.getElementById('settings-view-ai'),
+    aiSettingsForm: document.getElementById('ai-settings-form'),
+    settingLlmModel: document.getElementById('setting-llm-model'),
+    groupCustomModel: document.getElementById('group-custom-model'),
+    settingCustomModel: document.getElementById('setting-custom-model'),
+    settingEmbedModel: document.getElementById('setting-embed-model'),
+    settingNvidiaKey: document.getElementById('setting-nvidia-key'),
+    settingQdrantUrl: document.getElementById('setting-qdrant-url'),
+    settingQdrantKey: document.getElementById('setting-qdrant-key'),
+    
+    // AI RCA & RAG & Chatbot
+    btnRunRca: document.getElementById('btn-run-rca'),
+    btnOpenRag: document.getElementById('btn-open-rag'),
+    rcaModal: document.getElementById('rca-modal'),
+    rcaClose: document.getElementById('rca-close'),
+    rcaLoading: document.getElementById('rca-loading'),
+    rcaReportBody: document.getElementById('rca-report-body'),
+    
+    ragModal: document.getElementById('rag-modal'),
+    ragClose: document.getElementById('rag-close'),
+    ragTabFile: document.getElementById('rag-tab-file'),
+    ragTabManual: document.getElementById('rag-tab-manual'),
+    ragViewFile: document.getElementById('rag-view-file'),
+    ragViewManual: document.getElementById('rag-view-manual'),
+    ragFileForm: document.getElementById('rag-file-form'),
+    ragFileCategory: document.getElementById('rag-file-category'),
+    ragDropzone: document.getElementById('rag-dropzone'),
+    ragFileInput: document.getElementById('rag-file-input'),
+    ragFilePreview: document.getElementById('rag-file-preview'),
+    ragFileName: document.getElementById('rag-file-name'),
+    btnRemoveRagFile: document.getElementById('btn-remove-rag-file'),
+    btnUploadRagFile: document.getElementById('btn-upload-rag-file'),
+    btnDockRag: document.getElementById('btn-dock-rag'),
+    ragProgressSection: document.getElementById('rag-progress-section'),
+    ragProgressStatusText: document.getElementById('rag-progress-status-text'),
+    ragProgressPercentage: document.getElementById('rag-progress-percentage'),
+    ragProgressBarFill: document.getElementById('rag-progress-bar-fill'),
+    ragLiveLogList: document.getElementById('rag-live-log-list'),
+    
+    dockedRagWidget: document.getElementById('docked-rag-widget'),
+    dockedRagStatusText: document.getElementById('docked-rag-status-text'),
+    dockedRagProgressBar: document.getElementById('docked-rag-progress-bar'),
+    btnMaximizeDockedRag: document.getElementById('btn-maximize-docked-rag'),
+    btnCloseDockedRag: document.getElementById('btn-close-docked-rag'),
+    
+    ragIngestForm: document.getElementById('rag-ingest-form'),
+    ragTitle: document.getElementById('rag-title'),
+    ragCategory: document.getElementById('rag-category'),
+    ragContent: document.getElementById('rag-content'),
+    ragDocsContainer: document.getElementById('rag-docs-container'),
+    
+    chatWidgetToggle: document.getElementById('chat-widget-toggle'),
+    chatDrawer: document.getElementById('chat-drawer'),
+    chatDrawerClose: document.getElementById('chat-drawer-close'),
+    chatHistory: document.getElementById('chat-history'),
+    chatForm: document.getElementById('chat-form'),
+    chatInput: document.getElementById('chat-input'),
     
     // Modal Explorer Tabs
     explorerModal: document.getElementById('explorer-modal'),
@@ -107,14 +208,16 @@ function loadAppVersion(){
 
 
 function initApp() {
+    applyTheme(appState.currentTheme);
     setupEventListeners();
     setupErrorLogging();
+    checkAuthStatus();
     checkEngineStatus();
     loadRegistryData();
     loadAppVersion();
     
     window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => {
-        if (appState.allData.length > 0) {
+        if (appState.currentTheme === 'system' && appState.allData.length > 0) {
             renderCharts();
         }
     });
@@ -124,10 +227,140 @@ function initApp() {
 // Event Listeners Configuration
 // ----------------------------------------------------
 function setupEventListeners() {
-    // Ingestion controls
-  
-    elements.folderPickerClient.addEventListener('change', handleClientFolderSelected);
+    // Header Actions (Profile & Settings)
+    if (elements.btnHeaderProfile) elements.btnHeaderProfile.addEventListener('click', openProfileModal);
+    if (elements.btnHeaderSettings) elements.btnHeaderSettings.addEventListener('click', openSettingsModal);
+    
+    // Settings Tabs & AI Models
+    if (elements.tabBtnTheme) elements.tabBtnTheme.addEventListener('click', () => switchSettingsTab('theme'));
+    if (elements.tabBtnAi) elements.tabBtnAi.addEventListener('click', () => switchSettingsTab('ai'));
+    if (elements.settingLlmModel) {
+        elements.settingLlmModel.addEventListener('change', () => {
+            if (elements.settingLlmModel.value === 'custom') {
+                if (elements.groupCustomModel) elements.groupCustomModel.classList.remove('hidden');
+            } else {
+                if (elements.groupCustomModel) elements.groupCustomModel.classList.add('hidden');
+            }
+        });
+    }
+    if (elements.aiSettingsForm) elements.aiSettingsForm.addEventListener('submit', handleAiSettingsSubmit);
+    
+    // AI RCA & RAG Knowledge Base Controls
+    if (elements.btnRunRca) elements.btnRunRca.addEventListener('click', runAiRcaAnalysis);
+    if (elements.btnOpenRag) elements.btnOpenRag.addEventListener('click', openRagModal);
+    if (elements.rcaClose) elements.rcaClose.addEventListener('click', closeRcaModal);
+    if (elements.ragClose) elements.ragClose.addEventListener('click', closeRagModal);
+    if (elements.btnDockRag) elements.btnDockRag.addEventListener('click', dockRagModal);
+    if (elements.btnMaximizeDockedRag) elements.btnMaximizeDockedRag.addEventListener('click', maximizeRagDock);
+    if (elements.btnCloseDockedRag) elements.btnCloseDockedRag.addEventListener('click', closeRagDock);
+    if (elements.ragTabFile) elements.ragTabFile.addEventListener('click', () => switchRagTab('file'));
+    if (elements.ragTabManual) elements.ragTabManual.addEventListener('click', () => switchRagTab('manual'));
+    
+    if (elements.ragDropzone) {
+        elements.ragDropzone.addEventListener('click', () => {
+            if (elements.ragFileInput) elements.ragFileInput.click();
+        });
+        elements.ragDropzone.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            elements.ragDropzone.classList.add('drag-over');
+        });
+        elements.ragDropzone.addEventListener('dragleave', () => {
+            elements.ragDropzone.classList.remove('drag-over');
+        });
+        elements.ragDropzone.addEventListener('drop', (e) => {
+            e.preventDefault();
+            elements.ragDropzone.classList.remove('drag-over');
+            if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+                handleSelectedRagFile(e.dataTransfer.files[0]);
+            }
+        });
+    }
+    if (elements.ragFileInput) {
+        elements.ragFileInput.addEventListener('change', (e) => {
+            if (e.target.files && e.target.files.length > 0) {
+                handleSelectedRagFile(e.target.files[0]);
+            }
+        });
+    }
+    if (elements.btnRemoveRagFile) {
+        elements.btnRemoveRagFile.addEventListener('click', (e) => {
+            e.stopPropagation();
+            clearSelectedRagFile();
+        });
+    }
+    if (elements.ragFileForm) elements.ragFileForm.addEventListener('submit', handleRagFileUpload);
+    if (elements.ragIngestForm) elements.ragIngestForm.addEventListener('submit', handleRagIngest);
+    
+    // AI Chatbot Widget Controls
+    if (elements.chatWidgetToggle) elements.chatWidgetToggle.addEventListener('click', toggleChatDrawer);
+    if (elements.chatDrawerClose) elements.chatDrawerClose.addEventListener('click', closeChatDrawer);
+    if (elements.chatForm) elements.chatForm.addEventListener('submit', handleChatSubmit);
+    
+    document.querySelectorAll('.chip-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const prompt = btn.dataset.prompt;
+            if (prompt && elements.chatInput) {
+                elements.chatInput.value = prompt;
+                handleChatSubmit(new Event('submit'));
+            }
+        });
+    });
+    
+    if (elements.profileClose) elements.profileClose.addEventListener('click', closeProfileModal);
+    if (elements.settingsClose) elements.settingsClose.addEventListener('click', closeSettingsModal);
+    
+    if (elements.btnProfileSignout) {
+        elements.btnProfileSignout.addEventListener('click', () => {
+            closeProfileModal();
+            handleSignOut();
+        });
+    }
+    if (elements.btnProfileSignin) {
+        elements.btnProfileSignin.addEventListener('click', () => {
+            closeProfileModal();
+            openSignInModal();
+        });
+    }
+    if (elements.btnProfileSignup) {
+        elements.btnProfileSignup.addEventListener('click', () => {
+            closeProfileModal();
+            openSignUpModal();
+        });
+    }
 
+    // Theme Selection Radios
+    document.querySelectorAll('input[name="app-theme"]').forEach(radio => {
+        radio.addEventListener('change', (e) => {
+            applyTheme(e.target.value);
+            showToast(`Theme changed to ${e.target.value.replace('-', ' ')}`);
+        });
+    });
+
+    // Auth Modals Controls
+    if (elements.signinClose) elements.signinClose.addEventListener('click', closeSignInModal);
+    if (elements.signupClose) elements.signupClose.addEventListener('click', closeSignUpModal);
+    
+    if (elements.linkGotoSignup) {
+        elements.linkGotoSignup.addEventListener('click', (e) => {
+            e.preventDefault();
+            closeSignInModal();
+            openSignUpModal();
+        });
+    }
+    
+    if (elements.linkGotoSignin) {
+        elements.linkGotoSignin.addEventListener('click', (e) => {
+            e.preventDefault();
+            closeSignUpModal();
+            openSignInModal();
+        });
+    }
+    
+    if (elements.signinForm) elements.signinForm.addEventListener('submit', handleSignIn);
+    if (elements.signupForm) elements.signupForm.addEventListener('submit', handleSignUp);
+
+    // Ingestion controls
+    elements.folderPickerClient.addEventListener('change', handleClientFolderSelected);
     elements.btnToggleLogs.addEventListener('click', toggleLogsMinimization);
     
     // Clear Filters Action
@@ -140,7 +373,6 @@ function setupEventListeners() {
     });
     elements.btnToggleLogs.addEventListener('click', toggleLogsMinimization);
     elements.btnToggleLogs.classList.add('hidden');
-    
     
     // Event delegation for dynamic header column filters
     elements.tableHeadersRow.addEventListener('change', (e) => {
@@ -193,17 +425,19 @@ function setupEventListeners() {
     elements.explorerShortcutWorkspace.addEventListener('click', () => fetchDirectoryContents(""));
     elements.explorerShortcutRoot.addEventListener('click', () => fetchDirectoryContents("C:\\"));
     elements.explorerShortcutUser.addEventListener('click', () => fetchDirectoryContents("USER_HOME"));
-    
+
     // Click triggers for Client Drag/Drop
-    elements.uploadDropzone.addEventListener('click', () => {
-        elements.folderPickerClient.click();
-    });
-    
-    ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
-        elements.uploadDropzone.addEventListener(eventName, preventDefaults, false);
-    });
-    
-    elements.uploadDropzone.addEventListener('drop', handleClientFolderDrop, false);
+    if (elements.uploadDropzone) {
+        elements.uploadDropzone.addEventListener('click', () => {
+            elements.folderPickerClient.click();
+        });
+        
+        ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+            elements.uploadDropzone.addEventListener(eventName, preventDefaults, false);
+        });
+        
+        elements.uploadDropzone.addEventListener('drop', handleClientFolderDrop, false);
+    }
 
     // Chart Dialog Event Listeners
     document.querySelectorAll('.chart-card[data-chart-id]').forEach(card => {
@@ -299,8 +533,284 @@ function setupEventListeners() {
 }
 
 // ----------------------------------------------------
-// Folder Selection & Action Ingest Buttons
+// Authentication Logic & Flow Handlers
 // ----------------------------------------------------
+function checkAuthStatus() {
+    if (!appState.authToken) {
+        appState.currentUser = null;
+        updateAuthUI();
+        return;
+    }
+    
+    fetch('/api/me', {
+        headers: { 'Authorization': `Bearer ${appState.authToken}` }
+    })
+    .then(async res => {
+        if (!res.ok) {
+            appState.authToken = null;
+            appState.currentUser = null;
+            localStorage.removeItem('diagtrace_token');
+            updateAuthUI();
+            return;
+        }
+        return res.json();
+    })
+    .then(data => {
+        if (data && data.user) {
+            appState.currentUser = data.user;
+        } else {
+            appState.currentUser = null;
+            appState.authToken = null;
+            localStorage.removeItem('diagtrace_token');
+        }
+        updateAuthUI();
+    })
+    .catch(() => {
+        updateAuthUI();
+    });
+}
+
+function applyTheme(themeName) {
+    if (!themeName) themeName = 'white';
+    appState.currentTheme = themeName;
+    localStorage.setItem('diagtrace_theme', themeName);
+    document.documentElement.setAttribute('data-theme', themeName);
+    
+    const radio = document.querySelector(`input[name="app-theme"][value="${themeName}"]`);
+    if (radio) radio.checked = true;
+    
+    if (appState.allData && appState.allData.length > 0) {
+        renderCharts();
+    }
+}
+
+function updateAuthUI() {
+    if (appState.currentUser) {
+        if (elements.headerProfileText) {
+            elements.headerProfileText.innerText = appState.currentUser.name || appState.currentUser.username;
+        }
+        if (elements.profileUserView) elements.profileUserView.classList.remove('hidden');
+        if (elements.profileGuestView) elements.profileGuestView.classList.add('hidden');
+        if (elements.profileDisplayName) elements.profileDisplayName.innerText = appState.currentUser.name;
+        if (elements.profileUsername) elements.profileUsername.innerText = appState.currentUser.username;
+        if (elements.profileEmail) elements.profileEmail.innerText = appState.currentUser.email;
+    } else {
+        if (elements.headerProfileText) {
+            elements.headerProfileText.innerText = 'Profile';
+        }
+        if (elements.profileUserView) elements.profileUserView.classList.add('hidden');
+        if (elements.profileGuestView) elements.profileGuestView.classList.remove('hidden');
+    }
+    buildHeaderFiltersMarkup();
+    renderGridAndPagination();
+}
+
+function openProfileModal() {
+    if (elements.profileModal) elements.profileModal.classList.remove('hidden');
+}
+
+function closeProfileModal() {
+    if (elements.profileModal) elements.profileModal.classList.add('hidden');
+}
+
+function openSettingsModal() {
+    applyTheme(appState.currentTheme);
+    fetchAiSettings();
+    if (elements.settingsModal) elements.settingsModal.classList.remove('hidden');
+}
+
+function closeSettingsModal() {
+    if (elements.settingsModal) elements.settingsModal.classList.add('hidden');
+}
+
+function switchSettingsTab(tabName) {
+    if (tabName === 'theme') {
+        if (elements.tabBtnTheme) elements.tabBtnTheme.classList.add('active');
+        if (elements.tabBtnAi) elements.tabBtnAi.classList.remove('active');
+        if (elements.settingsViewTheme) elements.settingsViewTheme.classList.remove('hidden');
+        if (elements.settingsViewAi) elements.settingsViewAi.classList.add('hidden');
+    } else {
+        if (elements.tabBtnTheme) elements.tabBtnTheme.classList.remove('active');
+        if (elements.tabBtnAi) elements.tabBtnAi.classList.add('active');
+        if (elements.settingsViewTheme) elements.settingsViewTheme.classList.add('hidden');
+        if (elements.settingsViewAi) elements.settingsViewAi.classList.remove('hidden');
+        fetchAiSettings();
+    }
+}
+
+function fetchAiSettings() {
+    fetch('/api/settings/ai')
+    .then(res => res.json())
+    .then(data => {
+        if (!elements.settingLlmModel) return;
+        
+        const modelOptions = Array.from(elements.settingLlmModel.options).map(o => o.value);
+        if (modelOptions.includes(data.nvidia_model)) {
+            elements.settingLlmModel.value = data.nvidia_model;
+            if (elements.groupCustomModel) elements.groupCustomModel.classList.add('hidden');
+        } else {
+            elements.settingLlmModel.value = 'custom';
+            if (elements.groupCustomModel) elements.groupCustomModel.classList.remove('hidden');
+            if (elements.settingCustomModel) elements.settingCustomModel.value = data.nvidia_model;
+        }
+
+        if (elements.settingEmbedModel) elements.settingEmbedModel.value = data.nvidia_embed_model || 'nvidia/nv-embedqa-e5-v5';
+        if (elements.settingQdrantUrl) elements.settingQdrantUrl.value = data.qdrant_url || '';
+    })
+    .catch(() => {});
+}
+
+function handleAiSettingsSubmit(e) {
+    e.preventDefault();
+    let modelName = elements.settingLlmModel.value;
+    if (modelName === 'custom') {
+        modelName = elements.settingCustomModel.value.trim();
+    }
+    const embedModel = elements.settingEmbedModel.value;
+    const nvidiaKey = elements.settingNvidiaKey.value.trim();
+    const qdrantUrl = elements.settingQdrantUrl.value.trim();
+    const qdrantKey = elements.settingQdrantKey.value.trim();
+
+    fetch('/api/settings/ai', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            nvidia_api_key: nvidiaKey ? nvidiaKey : undefined,
+            nvidia_model: modelName,
+            nvidia_embed_model: embedModel,
+            qdrant_url: qdrantUrl ? qdrantUrl : undefined,
+            qdrant_api_key: qdrantKey ? qdrantKey : undefined
+        })
+    })
+    .then(res => res.json())
+    .then(data => {
+        showToast("Information is stored successfully!");
+        if (elements.settingNvidiaKey) elements.settingNvidiaKey.value = '';
+        if (elements.settingQdrantKey) elements.settingQdrantKey.value = '';
+        if (elements.settingQdrantUrl) elements.settingQdrantUrl.value = '';
+        if (elements.settingCustomModel) elements.settingCustomModel.value = '';
+        fetchAiSettings();
+    })
+    .catch(err => {
+        showToast(`Failed to update AI settings: ${err.message}`, 'warning');
+    });
+}
+
+function openSignInModal() {
+    if (elements.signinError) {
+        elements.signinError.classList.add('hidden');
+        elements.signinError.innerText = '';
+    }
+    if (elements.signinForm) elements.signinForm.reset();
+    if (elements.signinModal) elements.signinModal.classList.remove('hidden');
+}
+
+function closeSignInModal() {
+    if (elements.signinModal) elements.signinModal.classList.add('hidden');
+}
+
+function openSignUpModal() {
+    if (elements.signupError) {
+        elements.signupError.classList.add('hidden');
+        elements.signupError.innerText = '';
+    }
+    if (elements.signupForm) elements.signupForm.reset();
+    if (elements.signupModal) elements.signupModal.classList.remove('hidden');
+}
+
+function closeSignUpModal() {
+    if (elements.signupModal) elements.signupModal.classList.add('hidden');
+}
+
+function handleSignIn(e) {
+    e.preventDefault();
+    const identifier = elements.signinIdentifier.value.trim();
+    const password = elements.signinPassword.value;
+    
+    fetch('/api/signin', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username_or_email: identifier, password: password })
+    })
+    .then(async res => {
+        const data = await res.json();
+        if (!res.ok) {
+            throw new Error(data.detail || 'Sign in failed.');
+        }
+        return data;
+    })
+    .then(data => {
+        appState.authToken = data.token;
+        appState.currentUser = data.user;
+        localStorage.setItem('diagtrace_token', data.token);
+        closeSignInModal();
+        updateAuthUI();
+        showToast(`Welcome back, ${data.user.name}!`);
+    })
+    .catch(err => {
+        if (elements.signinError) {
+            elements.signinError.innerText = err.message;
+            elements.signinError.classList.remove('hidden');
+        }
+    });
+}
+
+function handleSignUp(e) {
+    e.preventDefault();
+    const name = elements.signupName.value.trim();
+    const username = elements.signupUsername.value.trim();
+    const email = elements.signupEmail.value.trim();
+    const password = elements.signupPassword.value;
+    
+    fetch('/api/signup', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, username, email, password })
+    })
+    .then(async res => {
+        const data = await res.json();
+        if (!res.ok) {
+            throw new Error(data.detail || 'Sign up failed.');
+        }
+        return data;
+    })
+    .then(data => {
+        appState.authToken = data.token;
+        appState.currentUser = data.user;
+        localStorage.setItem('diagtrace_token', data.token);
+        closeSignUpModal();
+        updateAuthUI();
+        showToast(`Account created! Welcome, ${data.user.name}!`);
+    })
+    .catch(err => {
+        if (elements.signupError) {
+            elements.signupError.innerText = err.message;
+            elements.signupError.classList.remove('hidden');
+        }
+    });
+}
+
+function handleSignOut() {
+    if (appState.authToken) {
+        fetch('/api/signout', {
+            method: 'POST',
+            headers: { 'Authorization': `Bearer ${appState.authToken}` }
+        }).catch(() => {});
+    }
+    appState.authToken = null;
+    appState.currentUser = null;
+    localStorage.removeItem('diagtrace_token');
+    updateAuthUI();
+    showToast("Signed out successfully.");
+}
+
+function showSignInPromptToast() {
+    if (!appState.currentUser) {
+        showToast("Please sign in to edit diagnostic records.", "warning");
+        openSignInModal();
+    }
+}
+    
 function preventDefaults(e) {
     e.preventDefault();
     e.stopPropagation();
@@ -765,13 +1275,17 @@ function buildHeaderFiltersMarkup() {
     appState.columns.forEach(col => {
         const th = document.createElement('th');
         
-        // Mark editable header visually
-        const isEditable = (col === "Comments" || col === "Issue Status" || col === "Author");
+        // Mark editable header visually when signed in
+        const isEditableCol = (col === "Comments" || col === "Issue Status");
+        const isEditable = isEditableCol && appState.currentUser;
         if (isEditable) {
             th.className = "editable-hdr";
         }
         
-        const titleText = isEditable ? `${col} ✏️` : col;
+        let titleText = col;
+        if (isEditableCol) {
+            titleText = appState.currentUser ? `${col} ✏️` : col;
+        }
         
         // Determine filter type dynamically
         let filterControl = "";
@@ -981,22 +1495,38 @@ function renderGridAndPagination() {
             
             // Editable Column 1: Issue Status
             if (col === "Issue Status") {
-                td.className = "editable-cell";
-                const statusClass = String(cellValue).toLowerCase().replace('/\s+/g', '-');
+                const statusClass = String(cellValue).toLowerCase().replace(/\s+/g, '-');
                 td.innerHTML = `<span class="status-tag ${statusClass}">${cellValue}</span>`;
-                td.addEventListener('dblclick', () => editStatusCell(td, row.index, cellValue, statusOptions));
+                if (appState.currentUser) {
+                    td.className = "editable-cell editable-cell-active";
+                    td.addEventListener('dblclick', () => editStatusCell(td, row.index, cellValue, statusOptions));
+                } else {
+                    td.className = "cell-locked";
+                    td.addEventListener('dblclick', () => showSignInPromptToast());
+                }
             } 
             // Editable Column 2: Comments
             else if (col === "Comments") {
-                td.className = "editable-cell";
                 td.innerText = String(cellValue).replace(/[\r\n]+/g, ' ');
-                td.addEventListener('dblclick', () => editTextFieldCell(td, row.index, 'Comments', cellValue));
+                if (appState.currentUser) {
+                    td.className = "editable-cell editable-cell-active";
+                    td.addEventListener('dblclick', () => editTextFieldCell(td, row.index, 'Comments', cellValue));
+                } else {
+                    td.className = "cell-locked";
+                    td.addEventListener('dblclick', () => showSignInPromptToast());
+                }
             } 
-            // Editable Column 3: Author
+            // Automatic Author Column (Direct edit option removed)
             else if (col === "Author") {
-                td.className = "editable-cell";
+                td.className = "cell-locked";
                 td.innerText = String(cellValue).replace(/[\r\n]+/g, ' ');
-                td.addEventListener('dblclick', () => editTextFieldCell(td, row.index, 'Author', cellValue));
+                td.addEventListener('dblclick', () => {
+                    if (!appState.currentUser) {
+                        showSignInPromptToast();
+                    } else {
+                        showToast("Author is automatically set to your logged-in name when editing comments or status.", "info");
+                    }
+                });
             }
             // Non-editable columns
             else {
@@ -1007,6 +1537,11 @@ function renderGridAndPagination() {
                     td.className = "font-mono";
                 }
                 td.innerText = String(cellValue).replace(/[\r\n]+/g, ' ');
+                td.addEventListener('dblclick', () => {
+                    if (!appState.currentUser) {
+                        showSignInPromptToast();
+                    }
+                });
             }
             
             tr.appendChild(td);
@@ -1111,9 +1646,14 @@ function saveRowUpdate(rowIndex, updatePayload) {
         Author: updatePayload.hasOwnProperty('Author') ? updatePayload.Author : (authorCol ? record[authorCol] : "")
     };
     
+    const headers = { 'Content-Type': 'application/json' };
+    if (appState.authToken) {
+        headers['Authorization'] = `Bearer ${appState.authToken}`;
+    }
+    
     fetch('/api/update-row', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: headers,
         body: JSON.stringify(finalPayload)
     })
     .then(async res => {
@@ -1126,10 +1666,12 @@ function saveRowUpdate(rowIndex, updatePayload) {
     })
     .then(result => {
         if (result.status === 'success') {
+            const updatedAuthor = result.author || (appState.currentUser ? appState.currentUser.name : finalPayload.Author);
+            
             // Update local state dynamically
             if (commentsCol) appState.allData[recordIdx][commentsCol] = finalPayload.Comments;
             if (statusCol) appState.allData[recordIdx][statusCol] = finalPayload.Issue_Status;
-            if (authorCol) appState.allData[recordIdx][authorCol] = finalPayload.Author;
+            if (authorCol) appState.allData[recordIdx][authorCol] = updatedAuthor;
             
             if (appState.columns.includes("Last Updated")) {
                 appState.allData[recordIdx]["Last Updated"] = result.last_updated;
@@ -1148,7 +1690,7 @@ function saveRowUpdate(rowIndex, updatePayload) {
             if (fIdx !== -1) {
                 if (commentsCol) appState.filteredData[fIdx][commentsCol] = finalPayload.Comments;
                 if (statusCol) appState.filteredData[fIdx][statusCol] = finalPayload.Issue_Status;
-                if (authorCol) appState.filteredData[fIdx][authorCol] = finalPayload.Author;
+                if (authorCol) appState.filteredData[fIdx][authorCol] = updatedAuthor;
                 if (appState.columns.includes("Last Updated")) {
                     appState.filteredData[fIdx]["Last Updated"] = result.last_updated;
                 }
@@ -1517,4 +2059,382 @@ function closeChartDialog() {
         existingDialogChart.destroy();
     }
     activeDialogChart = null;
+}
+
+// ----------------------------------------------------
+// AI Root Cause Analysis (RCA) & RAG Knowledge Base
+// ----------------------------------------------------
+function runAiRcaAnalysis() {
+    if (elements.rcaModal) elements.rcaModal.classList.remove('hidden');
+    if (elements.rcaLoading) elements.rcaLoading.classList.remove('hidden');
+    if (elements.rcaReportBody) elements.rcaReportBody.innerHTML = '';
+
+    fetch('/api/ai/rca', { method: 'POST' })
+    .then(res => res.json())
+    .then(data => {
+        if (elements.rcaLoading) elements.rcaLoading.classList.add('hidden');
+        if (data.status === 'success' && elements.rcaReportBody) {
+            elements.rcaReportBody.innerHTML = renderMarkdownSimple(data.report_markdown);
+        } else if (elements.rcaReportBody) {
+            elements.rcaReportBody.innerHTML = `<p class="auth-error-msg">${data.message || 'Failed to run RCA analysis.'}</p>`;
+        }
+    })
+    .catch(err => {
+        if (elements.rcaLoading) elements.rcaLoading.classList.add('hidden');
+        if (elements.rcaReportBody) {
+            elements.rcaReportBody.innerHTML = `<p class="auth-error-msg">Error running RCA: ${err.message}</p>`;
+        }
+    });
+}
+
+function closeRcaModal() {
+    if (elements.rcaModal) elements.rcaModal.classList.add('hidden');
+}
+
+function openRagModal() {
+    if (elements.ragModal) elements.ragModal.classList.remove('hidden');
+    fetchRagDocuments();
+}
+
+function closeRagModal() {
+    if (elements.ragModal) elements.ragModal.classList.add('hidden');
+}
+
+function fetchRagDocuments() {
+    if (!elements.ragDocsContainer) return;
+    fetch('/api/rag/documents')
+    .then(res => res.json())
+    .then(data => {
+        if (data.documents && data.documents.length > 0) {
+            elements.ragDocsContainer.innerHTML = data.documents.map(doc => `
+                <div class="rag-doc-item">
+                    <div>
+                        <b>${escapeHtml(doc.title)}</b>
+                        <div class="text-muted" style="font-size:0.78rem;">Indexed: ${doc.created_at}</div>
+                    </div>
+                    <span class="rag-doc-badge">${escapeHtml(doc.category)}</span>
+                </div>
+            `).join('');
+        } else {
+            elements.ragDocsContainer.innerHTML = '<p class="text-muted">No custom knowledge items indexed yet.</p>';
+        }
+    })
+    .catch(() => {
+        elements.ragDocsContainer.innerHTML = '<p class="text-muted">Failed to load documents.</p>';
+    });
+}
+
+let selectedRagFile = null;
+
+function switchRagTab(tabName) {
+    if (tabName === 'file') {
+        if (elements.ragTabFile) elements.ragTabFile.classList.add('active');
+        if (elements.ragTabManual) elements.ragTabManual.classList.remove('active');
+        if (elements.ragViewFile) elements.ragViewFile.classList.remove('hidden');
+        if (elements.ragViewManual) elements.ragViewManual.classList.add('hidden');
+    } else {
+        if (elements.ragTabFile) elements.ragTabFile.classList.remove('active');
+        if (elements.ragTabManual) elements.ragTabManual.classList.add('active');
+        if (elements.ragViewFile) elements.ragViewFile.classList.add('hidden');
+        if (elements.ragViewManual) elements.ragViewManual.classList.remove('hidden');
+    }
+}
+
+function handleSelectedRagFile(file) {
+    if (!file) return;
+    selectedRagFile = file;
+    if (elements.ragFileName) elements.ragFileName.innerText = `${file.name} (${(file.size / 1024).toFixed(1)} KB)`;
+    if (elements.ragFilePreview) elements.ragFilePreview.classList.remove('hidden');
+}
+
+function clearSelectedRagFile() {
+    selectedRagFile = null;
+    if (elements.ragFileInput) elements.ragFileInput.value = '';
+    if (elements.ragFilePreview) elements.ragFilePreview.classList.add('hidden');
+    if (elements.ragFileName) elements.ragFileName.innerText = '';
+}
+
+let activeRagJobId = null;
+let activeRagJobInterval = null;
+
+function dockRagModal() {
+    if (elements.ragModal) elements.ragModal.classList.add('hidden');
+    if (elements.dockedRagWidget) elements.dockedRagWidget.classList.remove('hidden');
+}
+
+function maximizeRagDock() {
+    if (elements.dockedRagWidget) elements.dockedRagWidget.classList.add('hidden');
+    if (elements.ragModal) elements.ragModal.classList.remove('hidden');
+}
+
+function closeRagDock() {
+    if (elements.dockedRagWidget) elements.dockedRagWidget.classList.add('hidden');
+}
+
+function handleRagFileUpload(e) {
+    e.preventDefault();
+    if (!selectedRagFile) {
+        showToast("Please select a document file to upload.", "warning");
+        return;
+    }
+
+    const category = elements.ragFileCategory ? elements.ragFileCategory.value : "Architectures";
+    const formData = new FormData();
+    formData.append("file", selectedRagFile);
+    formData.append("category", category);
+
+    if (elements.btnUploadRagFile) {
+        elements.btnUploadRagFile.disabled = true;
+        elements.btnUploadRagFile.innerText = "⌛ Ingestion Started...";
+    }
+
+    if (elements.ragProgressSection) elements.ragProgressSection.classList.remove('hidden');
+    if (elements.ragLiveLogList) elements.ragLiveLogList.innerHTML = '<li>⚡ Initializing background ingestion process...</li>';
+    if (elements.ragProgressBarFill) elements.ragProgressBarFill.style.width = '5%';
+    if (elements.ragProgressPercentage) elements.ragProgressPercentage.innerText = '5%';
+    if (elements.ragProgressStatusText) elements.ragProgressStatusText.innerText = '⚡ Starting file processing...';
+
+    fetch('/api/rag/upload-file', {
+        method: 'POST',
+        body: formData
+    })
+    .then(res => {
+        if (!res.ok) return res.json().then(err => { throw new Error(err.detail || 'File upload failed'); });
+        return res.json();
+    })
+    .then(data => {
+        if (data.job_id) {
+            activeRagJobId = data.job_id;
+            startPollingRagJob(data.job_id);
+        }
+    })
+    .catch(err => {
+        showToast(`Failed to start ingestion: ${err.message}`, 'warning');
+        if (elements.btnUploadRagFile) {
+            elements.btnUploadRagFile.disabled = false;
+            elements.btnUploadRagFile.innerText = "📤 Parse, LLM Chunk & Ingest to Vector DB";
+        }
+    });
+}
+
+function startPollingRagJob(jobId) {
+    if (activeRagJobInterval) clearInterval(activeRagJobInterval);
+    
+    activeRagJobInterval = setInterval(() => {
+        fetch(`/api/rag/jobs/${jobId}`)
+        .then(res => res.json())
+        .then(job => {
+            updateRagJobProgressUI(job);
+            
+            if (job.status === 'completed') {
+                clearInterval(activeRagJobInterval);
+                activeRagJobInterval = null;
+                showToast("Information is stored successfully!");
+                clearSelectedRagFile();
+                fetchRagDocuments();
+                
+                if (elements.btnUploadRagFile) {
+                    elements.btnUploadRagFile.disabled = false;
+                    elements.btnUploadRagFile.innerText = "📤 Parse, LLM Chunk & Ingest to Vector DB";
+                }
+                
+                setTimeout(() => {
+                    if (elements.ragProgressSection) elements.ragProgressSection.classList.add('hidden');
+                    closeRagDock();
+                }, 4000);
+            } else if (job.status === 'error') {
+                clearInterval(activeRagJobInterval);
+                activeRagJobInterval = null;
+                showToast(`RAG Ingestion Error: ${job.error || 'Processing failed'}`, 'warning');
+                if (elements.btnUploadRagFile) {
+                    elements.btnUploadRagFile.disabled = false;
+                    elements.btnUploadRagFile.innerText = "📤 Parse, LLM Chunk & Ingest to Vector DB";
+                }
+            }
+        })
+        .catch(() => {});
+    }, 800);
+}
+
+function updateRagJobProgressUI(job) {
+    const pct = Math.min(100, Math.round(job.progress_percent || 0));
+    
+    if (elements.ragProgressBarFill) elements.ragProgressBarFill.style.width = `${pct}%`;
+    if (elements.ragProgressPercentage) elements.ragProgressPercentage.innerText = `${pct}%`;
+    
+    const pageInfo = job.total_pages ? ` (Page ${job.current_page || 1}/${job.total_pages})` : '';
+    const statusMsg = job.status === 'completed' ? '🎉 Ingestion Complete!' : (job.status === 'error' ? '❌ Failed' : `⚡ Ingesting ${job.file_name || 'file'}${pageInfo}`);
+    
+    if (elements.ragProgressStatusText) elements.ragProgressStatusText.innerText = statusMsg;
+
+    if (elements.dockedRagProgressBar) elements.dockedRagProgressBar.style.width = `${pct}%`;
+    if (elements.dockedRagStatusText) elements.dockedRagStatusText.innerText = `${statusMsg} [${pct}%]`;
+
+    if (elements.ragLiveLogList && job.logs && job.logs.length > 0) {
+        elements.ragLiveLogList.innerHTML = job.logs.map(l => `<li>${escapeHtml(l)}</li>`).join('');
+        const logContainer = elements.ragLiveLogList.parentElement;
+        if (logContainer) logContainer.scrollTop = logContainer.scrollHeight;
+    }
+}
+
+function handleRagIngest(e) {
+    e.preventDefault();
+    const title = elements.ragTitle.value.trim();
+    const category = elements.ragCategory.value;
+    const content = elements.ragContent.value.trim();
+
+    if (!title || !content) return;
+
+    fetch('/api/rag/ingest', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ title, category, content })
+    })
+    .then(res => res.json())
+    .then(data => {
+        showToast("Information is stored successfully!");
+        if (elements.ragTitle) elements.ragTitle.value = '';
+        if (elements.ragContent) elements.ragContent.value = '';
+        if (elements.ragIngestForm) elements.ragIngestForm.reset();
+        fetchRagDocuments();
+    })
+    .catch(err => {
+        showToast(`Failed to index document: ${err.message}`, 'warning');
+    });
+}
+
+// ----------------------------------------------------
+// AI Assistant Chatbot Widget & Dynamic Charts
+// ----------------------------------------------------
+function toggleChatDrawer() {
+    if (elements.chatDrawer) {
+        elements.chatDrawer.classList.toggle('hidden');
+    }
+}
+
+function closeChatDrawer() {
+    if (elements.chatDrawer) {
+        elements.chatDrawer.classList.add('hidden');
+    }
+}
+
+let chatChartCounter = 0;
+
+function handleChatSubmit(e) {
+    if (e && e.preventDefault) e.preventDefault();
+    const message = elements.chatInput.value.trim();
+    if (!message) return;
+
+    // Append User Message
+    appendChatMessage('user', message);
+    elements.chatInput.value = '';
+
+    // Append Bot Thinking Message
+    const botMsgId = `bot-msg-${Date.now()}`;
+    appendChatMessage('bot', '<em>AI is thinking & analyzing context...</em>', botMsgId);
+
+    fetch('/api/ai/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message: message })
+    })
+    .then(res => res.json())
+    .then(data => {
+        const botMsgEl = document.getElementById(botMsgId);
+        if (botMsgEl) {
+            let contentHtml = renderMarkdownSimple(data.reply_markdown);
+            
+            // If chart spec exists, create chart canvas container
+            if (data.chart_spec) {
+                chatChartCounter++;
+                const canvasId = `chat-chart-canvas-${chatChartCounter}`;
+                contentHtml += `<div class="chat-canvas-container"><canvas id="${canvasId}"></canvas></div>`;
+                botMsgEl.querySelector('.msg-bubble').innerHTML = contentHtml;
+                
+                // Render Chart.js chart after DOM update
+                setTimeout(() => {
+                    renderDynamicChatChart(canvasId, data.chart_spec);
+                }, 100);
+            } else {
+                botMsgEl.querySelector('.msg-bubble').innerHTML = contentHtml;
+            }
+        }
+        scrollChatToBottom();
+    })
+    .catch(err => {
+        const botMsgEl = document.getElementById(botMsgId);
+        if (botMsgEl) {
+            botMsgEl.querySelector('.msg-bubble').innerHTML = `<span style="color:var(--error);">Failed to get AI response: ${err.message}</span>`;
+        }
+    });
+}
+
+function appendChatMessage(sender, htmlContent, msgId = null) {
+    if (!elements.chatHistory) return;
+    const msgDiv = document.createElement('div');
+    msgDiv.className = `chat-message ${sender}`;
+    if (msgId) msgDiv.id = msgId;
+
+    const avatarHtml = sender === 'bot' ? '🤖' : '👤';
+    msgDiv.innerHTML = `
+        <div class="msg-avatar">${avatarHtml}</div>
+        <div class="msg-bubble">${htmlContent}</div>
+    `;
+    elements.chatHistory.appendChild(msgDiv);
+    scrollChatToBottom();
+}
+
+function scrollChatToBottom() {
+    if (elements.chatHistory) {
+        elements.chatHistory.scrollTop = elements.chatHistory.scrollHeight;
+    }
+}
+
+function renderDynamicChatChart(canvasId, spec) {
+    const canvas = document.getElementById(canvasId);
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    
+    new Chart(ctx, {
+        type: spec.type || 'bar',
+        data: {
+            labels: spec.labels || [],
+            datasets: spec.datasets || []
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                title: {
+                    display: true,
+                    text: spec.title || 'Diagnostic Analysis',
+                    color: getComputedStyle(document.documentElement).getPropertyValue('--text-primary').trim() || '#333',
+                    font: { size: 11 }
+                },
+                legend: {
+                    labels: {
+                        color: getComputedStyle(document.documentElement).getPropertyValue('--text-primary').trim() || '#333',
+                        font: { size: 9 }
+                    }
+                }
+            }
+        }
+    });
+}
+
+function renderMarkdownSimple(text) {
+    if (!text) return '';
+    let html = text
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/^### (.*$)/gim, '<h3>$1</h3>')
+        .replace(/^## (.*$)/gim, '<h2>$1</h2>')
+        .replace(/^# (.*$)/gim, '<h1>$1</h1>')
+        .replace(/\*\*(.*?)\*\*/g, '<b>$1</b>')
+        .replace(/\*(.*?)\*/g, '<i>$1</i>')
+        .replace(/`([^`]+)`/g, '<code>$1</code>')
+        .replace(/\n\n/g, '<br/><br/>')
+        .replace(/\n/g, '<br/>');
+    return html;
 }

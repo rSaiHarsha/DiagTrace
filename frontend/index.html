@@ -22,6 +22,14 @@
             <span id="db-status" class="status-indicator connected">
                 🗄️ Database Connected
             </span>
+            <div class="header-actions-group">
+                <button id="btn-header-profile" class="btn btn-secondary btn-small" title="User Profile">
+                    👤 <span id="header-profile-text">Profile</span>
+                </button>
+                <button id="btn-header-settings" class="btn btn-secondary btn-small" title="Settings">
+                    ⚙️ Settings
+                </button>
+            </div>
         </div>
     </header>
 
@@ -46,6 +54,12 @@
 
 
                     <div class="header-actions">
+                        <button id="btn-run-rca" class="btn btn-primary btn-small" title="Run AI Root Cause Analysis">
+                            🤖 AI Root Cause Analysis
+                        </button>
+                        <button id="btn-open-rag" class="btn btn-secondary btn-small" title="Manage RAG Knowledge Base">
+                            📚 Knowledge Base
+                        </button>
                         <button id="btn-clear-filters" class="btn btn-secondary btn-small"
                             title="Clear all active column filters">
                             ❌ Clear Filters
@@ -285,6 +299,361 @@
     <footer class="app-footer">
         <p>&copy; 2026 DiagTrace Inc. All rights reserved. Professional Diagnostics Control Center.</p>
     </footer>
+
+    <!-- SIGN IN MODAL -->
+    <div id="signin-modal" class="modal hidden">
+        <div class="modal-content auth-modal-content">
+            <div class="modal-header">
+                <h3>🔑 Sign In to DiagTrace</h3>
+                <span id="signin-close" class="modal-close">&times;</span>
+            </div>
+            <form id="signin-form" class="auth-form">
+                <div class="auth-error-msg hidden" id="signin-error"></div>
+                <div class="form-group">
+                    <label for="signin-identifier">Username or Email Address</label>
+                    <input type="text" id="signin-identifier" class="form-input" placeholder="Enter username or email" required autocomplete="username">
+                </div>
+                <div class="form-group">
+                    <label for="signin-password">Password</label>
+                    <input type="password" id="signin-password" class="form-input" placeholder="Enter password" required autocomplete="current-password">
+                </div>
+                <div class="auth-form-actions">
+                    <button type="submit" class="btn btn-primary btn-full">Sign In</button>
+                </div>
+                <div class="auth-switch-text">
+                    Don't have an account yet? <a href="#" id="link-goto-signup">Sign Up here</a>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- SIGN UP MODAL -->
+    <div id="signup-modal" class="modal hidden">
+        <div class="modal-content auth-modal-content">
+            <div class="modal-header">
+                <h3>📝 Create New Account</h3>
+                <span id="signup-close" class="modal-close">&times;</span>
+            </div>
+            <form id="signup-form" class="auth-form">
+                <div class="auth-error-msg hidden" id="signup-error"></div>
+                <div class="form-group">
+                    <label for="signup-name">Full Name</label>
+                    <input type="text" id="signup-name" class="form-input" placeholder="e.g. John Doe" required autocomplete="name">
+                </div>
+                <div class="form-group">
+                    <label for="signup-username">Username</label>
+                    <input type="text" id="signup-username" class="form-input" placeholder="e.g. jdoe" required autocomplete="username">
+                </div>
+                <div class="form-group">
+                    <label for="signup-email">Email Address</label>
+                    <input type="email" id="signup-email" class="form-input" placeholder="e.g. john@example.com" required autocomplete="email">
+                </div>
+                <div class="form-group">
+                    <label for="signup-password">Password</label>
+                    <input type="password" id="signup-password" class="form-input" placeholder="Create password" required autocomplete="new-password">
+                </div>
+                <div class="auth-form-actions">
+                    <button type="submit" class="btn btn-primary btn-full">Create Account & Sign In</button>
+                </div>
+                <div class="auth-switch-text">
+                    Already registered? <a href="#" id="link-goto-signin">Sign In here</a>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- PROFILE MODAL -->
+    <div id="profile-modal" class="modal hidden">
+        <div class="modal-content auth-modal-content">
+            <div class="modal-header">
+                <h3>👤 User Account Profile</h3>
+                <span id="profile-close" class="modal-close">&times;</span>
+            </div>
+            <div class="modal-body profile-modal-body">
+                <!-- Logged In User View -->
+                <div id="profile-user-view" class="profile-card hidden">
+                    <div class="profile-avatar">👤</div>
+                    <h4 id="profile-display-name">User Name</h4>
+                    <p class="profile-detail"><b>Username:</b> @<span id="profile-username">username</span></p>
+                    <p class="profile-detail"><b>Email:</b> <span id="profile-email">email@example.com</span></p>
+                    <div class="profile-actions">
+                        <button id="btn-profile-signout" class="btn btn-outline-danger btn-full">Sign Out</button>
+                    </div>
+                </div>
+                <!-- Guest / Logged Out View -->
+                <div id="profile-guest-view" class="profile-card">
+                    <div class="profile-avatar guest">👤</div>
+                    <h4>Guest Visitor</h4>
+                    <p class="text-muted">You are currently browsing in read-only guest mode. Sign in to edit diagnostic comments and issue statuses.</p>
+                    <div class="profile-guest-actions">
+                        <button id="btn-profile-signin" class="btn btn-primary btn-full">🔑 Sign In</button>
+                        <button id="btn-profile-signup" class="btn btn-secondary btn-full">📝 Sign Up</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- SETTINGS MODAL -->
+    <div id="settings-modal" class="modal hidden">
+        <div class="modal-content auth-modal-content settings-modal-content">
+            <div class="modal-header">
+                <h3>⚙️ Application Settings</h3>
+                <span id="settings-close" class="modal-close">&times;</span>
+            </div>
+            <div class="settings-tabs-header">
+                <button type="button" class="settings-tab-btn active" id="tab-btn-theme">🎨 Display Theme</button>
+                <button type="button" class="settings-tab-btn" id="tab-btn-ai">🤖 AI Models & Keys</button>
+            </div>
+            <div class="modal-body settings-modal-body">
+                <!-- Theme Tab View -->
+                <div id="settings-view-theme" class="settings-tab-view">
+                    <div class="settings-section">
+                        <h4>Choose Display Theme</h4>
+                        <p class="settings-desc">Select your preferred visual theme for the DiagTrace portal:</p>
+                        <div class="theme-options-grid">
+                            <label class="theme-option-card">
+                                <input type="radio" name="app-theme" value="white" checked>
+                                <span class="theme-preview white-preview"></span>
+                                <span class="theme-label">⚪ Default White</span>
+                            </label>
+                            <label class="theme-option-card">
+                                <input type="radio" name="app-theme" value="light-blue">
+                                <span class="theme-preview light-blue-preview"></span>
+                                <span class="theme-label">🩵 Light Blue</span>
+                            </label>
+                            <label class="theme-option-card">
+                                <input type="radio" name="app-theme" value="current-blue">
+                                <span class="theme-preview dark-blue-preview"></span>
+                                <span class="theme-label">🟦 Current Blue</span>
+                            </label>
+                            <label class="theme-option-card">
+                                <input type="radio" name="app-theme" value="system">
+                                <span class="theme-preview system-preview"></span>
+                                <span class="theme-label">💻 System Theme</span>
+                            </label>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- AI Models & Keys Tab View -->
+                <div id="settings-view-ai" class="settings-tab-view hidden">
+                    <form id="ai-settings-form" class="auth-form">
+                        <div class="form-group">
+                            <label for="setting-llm-model">🤖 Select NVIDIA LLM Model</label>
+                            <select id="setting-llm-model" class="form-input">
+                                <option value="meta/llama-3.3-70b-instruct">meta/llama-3.3-70b-instruct (Recommended)</option>
+                                <option value="nvidia/llama-3.1-nemotron-70b-instruct">nvidia/llama-3.1-nemotron-70b-instruct</option>
+                                <option value="mistralai/mixtral-8x22b-instruct-v0.1">mistralai/mixtral-8x22b-instruct-v0.1</option>
+                                <option value="deepseek-ai/deepseek-r1">deepseek-ai/deepseek-r1</option>
+                                <option value="custom">-- Enter Custom Model Identifier --</option>
+                            </select>
+                        </div>
+                        <div class="form-group hidden" id="group-custom-model">
+                            <label for="setting-custom-model">Custom NVIDIA Model ID</label>
+                            <input type="text" id="setting-custom-model" class="form-input" placeholder="e.g. nvidia/nemotron-4-340b-instruct">
+                        </div>
+
+                        <div class="form-group">
+                            <label for="setting-embed-model">📐 Embedding Vector Model</label>
+                            <select id="setting-embed-model" class="form-input">
+                                <option value="nvidia/nv-embedqa-e5-v5">nvidia/nv-embedqa-e5-v5 (Default)</option>
+                                <option value="nvidia/llama-3.2-nv-embedqa-1b-v2">nvidia/llama-3.2-nv-embedqa-1b-v2</option>
+                            </select>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="setting-nvidia-key">🔑 NVIDIA API Key</label>
+                            <input type="password" id="setting-nvidia-key" class="form-input" placeholder="nvapi-..." autocomplete="off">
+                        </div>
+
+                        <div class="form-group">
+                            <label for="setting-qdrant-url">⚡ Qdrant Cluster URL</label>
+                            <input type="text" id="setting-qdrant-url" class="form-input" placeholder="https://your-cluster.qdrant.tech" autocomplete="off">
+                        </div>
+
+                        <div class="form-group">
+                            <label for="setting-qdrant-key">🔑 Qdrant API Key</label>
+                            <input type="password" id="setting-qdrant-key" class="form-input" placeholder="Qdrant API key..." autocomplete="off">
+                        </div>
+
+                        <button type="submit" class="btn btn-primary btn-full">💾 Save AI & Model Settings</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- AI RCA REPORT MODAL -->
+    <div id="rca-modal" class="modal hidden">
+        <div class="modal-content rca-modal-content">
+            <div class="modal-header">
+                <h3>🤖 AI Root Cause Analysis & Diagnostic Report</h3>
+                <span id="rca-close" class="modal-close">&times;</span>
+            </div>
+            <div class="modal-body rca-modal-body">
+                <div id="rca-loading" class="rca-loading hidden">
+                    <span class="css-spinner"></span>
+                    <p>Synthesizing DTC database trends with Qdrant RAG Knowledge Base...</p>
+                </div>
+                <div id="rca-report-body" class="markdown-body">
+                    <!-- Dynamic Markdown Report inserted here -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- RAG KNOWLEDGE BASE MANAGER MODAL -->
+    <div id="rag-modal" class="modal hidden">
+        <div class="modal-content rag-modal-content">
+            <div class="modal-header">
+                <h3>📚 RAG Knowledge Base Manager</h3>
+                <div class="modal-header-actions">
+                    <button type="button" id="btn-dock-rag" class="modal-dock-btn" title="Minimize / Dock to Bottom Right">📌 Dock</button>
+                    <span id="rag-close" class="modal-close">&times;</span>
+                </div>
+            </div>
+            <div class="settings-tabs-header">
+                <button type="button" class="settings-tab-btn active" id="rag-tab-file">📁 File Upload (LLM Chunking)</button>
+                <button type="button" class="settings-tab-btn" id="rag-tab-manual">📝 Manual Text Input</button>
+            </div>
+            <div class="modal-body rag-modal-body">
+                <!-- Live Progress Feed Section -->
+                <div id="rag-progress-section" class="rag-progress-section hidden">
+                    <div class="progress-header-info">
+                        <span id="rag-progress-status-text" class="progress-status-text">⚡ Ingesting document...</span>
+                        <span id="rag-progress-percentage" class="progress-percentage">0%</span>
+                    </div>
+                    <div class="progress-bar-track">
+                        <div id="rag-progress-bar-fill" class="progress-bar-fill" style="width: 0%;"></div>
+                    </div>
+                    <div class="live-logs-container">
+                        <ul id="rag-live-log-list" class="live-log-list">
+                            <!-- Live status items prepended dynamically -->
+                        </ul>
+                    </div>
+                </div>
+
+                <!-- File Upload Tab View -->
+                <div id="rag-view-file" class="rag-tab-view">
+                    <form id="rag-file-form" class="auth-form">
+                        <div class="form-group">
+                            <label for="rag-file-category">Category</label>
+                            <select id="rag-file-category" class="form-input">
+                                <option value="Architectures">ECU Architecture Specs</option>
+                                <option value="Signal Information">Signal Information & CAN Matrices</option>
+                                <option value="Test Reports">Test Reports & Validation</option>
+                                <option value="Test Repository">Test Repository</option>
+                                <option value="Jira & Requirements">Jira & Requirements</option>
+                                <option value="Existing Issues">Existing Issues Repository</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Upload Document File (.pdf, .docx, .txt, .csv, .json, .md, .log)</label>
+                            <div id="rag-dropzone" class="file-dropzone">
+                                <div class="dropzone-icon">📄</div>
+                                <div class="dropzone-text">Drag & Drop document file here or <b>Browse</b></div>
+                                <div class="dropzone-hint">Supports PDF, DOCX, TXT, CSV, JSON, LOG, MD up to 25MB</div>
+                                <input type="file" id="rag-file-input" accept=".pdf,.docx,.txt,.csv,.json,.log,.md" class="hidden-file-input">
+                            </div>
+                            <div id="rag-file-preview" class="file-preview-badge hidden">
+                                📄 <span id="rag-file-name">filename.pdf</span>
+                                <button type="button" id="btn-remove-rag-file" class="btn-icon-remove">&times;</button>
+                            </div>
+                        </div>
+                        <button type="submit" id="btn-upload-rag-file" class="btn btn-primary btn-full">📤 Parse, LLM Chunk & Ingest to Vector DB</button>
+                    </form>
+                </div>
+
+                <!-- Manual Text Tab View -->
+                <div id="rag-view-manual" class="rag-tab-view hidden">
+                    <form id="rag-ingest-form" class="auth-form">
+                        <div class="form-group">
+                            <label for="rag-title">Document Title</label>
+                            <input type="text" id="rag-title" class="form-input" placeholder="e.g. ECM Architecture v3.2 Spec">
+                        </div>
+                        <div class="form-group">
+                            <label for="rag-category">Category</label>
+                            <select id="rag-category" class="form-input">
+                                <option value="Architectures">ECU Architecture</option>
+                                <option value="Signal Information">Signal Information & CAN</option>
+                                <option value="Test Reports">Test Reports</option>
+                                <option value="Test Repository">Test Repository</option>
+                                <option value="Jira & Requirements">Jira & Requirements</option>
+                                <option value="Existing Issues">Existing Issues Repository</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="rag-content">Document Content / Text</label>
+                            <textarea id="rag-content" class="form-input" rows="5" placeholder="Paste requirements, signal info, or test findings..."></textarea>
+                        </div>
+                        <button type="submit" class="btn btn-primary btn-full">📥 Index into Qdrant Vector DB</button>
+                    </form>
+                </div>
+
+                <div class="rag-docs-list-section">
+                    <h4>Indexed Knowledge Records</h4>
+                    <div id="rag-docs-container" class="rag-docs-container">
+                        <!-- Indexed documents loaded dynamically -->
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- FLOATING AI ASSISTANT CHATBOT WIDGET -->
+    <div id="ai-chatbot-widget" class="ai-chatbot-widget">
+        <!-- Floating Toggle Button -->
+        <button id="chat-widget-toggle" class="chat-widget-toggle" title="Open AI Diagnostic Assistant">
+            <span class="chat-icon">💬</span>
+            <span class="chat-label">AI Diagnostics Assistant</span>
+        </button>
+
+        <!-- Chat Drawer Window -->
+        <div id="chat-drawer" class="chat-drawer hidden">
+            <div class="chat-header">
+                <div class="chat-title">
+                    <span>🤖 DiagTrace AI Assistant</span>
+                    <span class="chat-status-dot"></span>
+                </div>
+                <button id="chat-drawer-close" class="close-dialog-btn">&times;</button>
+            </div>
+            <div id="chat-history" class="chat-history">
+                <div class="chat-message bot">
+                    <div class="msg-avatar">🤖</div>
+                    <div class="msg-bubble">
+                        Hello! I am your AI Diagnostics & RAG Assistant. Ask me anything about ECU architectures, CAN signal matrices, DTC root cause analysis, or ask me to <b>generate reports and draw custom charts</b>!
+                    </div>
+                </div>
+            </div>
+            <div class="chat-quick-chips">
+                <button class="chip-btn" data-prompt="Perform AI Root Cause Analysis on current diagnostic data">🤖 Run AI RCA</button>
+                <button class="chip-btn" data-prompt="Draw a chart showing Top Modules DTC breakdown">📊 Draw Module Chart</button>
+                <button class="chip-btn" data-prompt="Show diagnostic issue status distribution chart">🍩 Status Chart</button>
+            </div>
+            <form id="chat-form" class="chat-input-form">
+                <input type="text" id="chat-input" class="chat-input" placeholder="Ask AI or request a chart/report..." required autocomplete="off">
+                <button type="submit" id="chat-submit-btn" class="chat-submit-btn">Send ➔</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- DOCKED FLOATING RAG PROGRESS WIDGET -->
+    <div id="docked-rag-widget" class="docked-rag-widget hidden">
+        <div class="docked-widget-header">
+            <span class="docked-widget-title">⚡ RAG Background Processing</span>
+            <div class="docked-widget-actions">
+                <button type="button" id="btn-maximize-docked-rag" class="btn-dock-action" title="Maximize Window">🗖</button>
+                <button type="button" id="btn-close-docked-rag" class="btn-dock-action" title="Dismiss">&times;</button>
+            </div>
+        </div>
+        <div class="docked-widget-body">
+            <div id="docked-rag-status-text" class="docked-status-text">Processing document...</div>
+            <div class="docked-progress-track">
+                <div id="docked-rag-progress-bar" class="docked-progress-bar" style="width: 0%;"></div>
+            </div>
+        </div>
+    </div>
 
     <!-- Custom Frontend App Javascript -->
     <script src="app.js?v=2.1.0"></script>
