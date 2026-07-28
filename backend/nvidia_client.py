@@ -80,7 +80,7 @@ def query_nvidia_llm(prompt: str, system_prompt: Optional[str] = None, temperatu
     }
     
     try:
-        res = requests.post(f"{NVIDIA_BASE_URL}/chat/completions", headers=headers, json=payload, timeout=30)
+        res = requests.post(f"{NVIDIA_BASE_URL}/chat/completions", headers=headers, json=payload, timeout=550)
         if res.status_code == 200:
             data = res.json()
             if "choices" in data and len(data["choices"]) > 0:
