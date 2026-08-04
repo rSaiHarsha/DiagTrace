@@ -1,1 +1,67 @@
-mock content
+============================================================
+  VEHICLE DIAGNOSTIC REPORT - TCM (Transmission Control Module)
+  Program: Beta Sedan | Date: 2026-07-16
+============================================================
+
+[2026-07-16 07:45:22] VIN: 1FTPX14V87FB22130
+  MODULE: TCM (Transmission)
+  DTC Code: P0700
+  Description: Transmission Control System Malfunction
+  Severity: CRITICAL
+  Status: New
+  Notes: TCM reported generic malfunction indicator. Sub-codes pending retrieval.
+         Transmission fluid temp 105°C at time of fault. Normal operating range 80-95°C.
+         Vehicle entered limp mode at 65 mph highway cruise.
+
+[2026-07-16 08:12:38] VIN: 1FTPX14V87FB22130
+  MODULE: TCM (Transmission)
+  DTC Code: P0700
+  Description: Transmission Control System Malfunction
+  Severity: CRITICAL
+  Status: Open
+  Notes: Repeat occurrence after TCM reset. Shift solenoid 'A' response time degraded.
+         Measured: 48ms actuation delay (spec: <25ms).
+         Valve body inspection recommended per Service Procedure SP-4401.
+
+[2026-07-16 09:55:10] VIN: 1FTSX21P45EC77821
+  MODULE: TCM (Transmission)
+  DTC Code: P0700
+  Description: Transmission Control System Malfunction
+  Severity: WARNING
+  Status: In Progress
+  Notes: Intermittent P0700 set during 3-4 upshift at WOT.
+         Torque converter slip ratio exceeding 15% threshold.
+         ATF condition: Dark amber, metallic particulate detected on drain plug magnet.
+
+[2026-07-16 10:30:44] VIN: 1FTSX21P45EC77821
+  MODULE: ECM (Engine)
+  DTC Code: U0100
+  Description: Lost Communication With ECM/PCM
+  Severity: CRITICAL
+  Status: New
+  Notes: CAN bus communication loss between TCM and ECM detected.
+         Duration: 240ms dropout on CAN-H line.
+         Wiring harness connector X450 (engine-to-trans) shows corrosion on pins 3,7.
+         CAN bus termination resistance: 58 ohms (spec: 60 ohms +/- 2).
+
+[2026-07-16 11:14:19] VIN: 1FTKR1AD9NPA58172
+  MODULE: TCM (Transmission)
+  DTC Code: P0700
+  Description: Transmission Control System Malfunction
+  Severity: WARNING
+  Status: Under Investigation
+  Notes: P0700 stored as pending DTC. No driveability concern reported by customer.
+         Freeze frame: Vehicle speed 0 mph, engine RPM 750 (idle).
+         Possible phantom code from low battery voltage event (11.2V recorded).
+
+[2026-07-16 12:05:33] VIN: 1FTKR1AD9NPA58172
+  MODULE: ECM (Engine)
+  DTC Code: P0300
+  Description: Random/Multiple Cylinder Misfire Detected
+  Severity: CRITICAL
+  Status: New
+  Notes: Misfire counter cylinder 1: 47 events / 1000 revolutions.
+         Fuel rail pressure nominal at 58 psi. Compression test: Cyl 1 = 125 psi (spec: 150 +/- 10).
+         Possible head gasket breach between cylinder 1 and coolant passage.
+
+--- END OF LOG FILE 2 ---

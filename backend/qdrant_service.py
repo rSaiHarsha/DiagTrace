@@ -156,10 +156,23 @@ def query_rag_context(query_text: str, query_vector: List[float], category: Opti
                 collection_exists = False
 
             if collection_exists:
+                from qdrant_client.http import models
+                query_filter = None
+                if category and category.strip():
+                    query_filter = models.Filter(
+                        must=[
+                            models.FieldCondition(
+                                key="category",
+                                match=models.MatchValue(value=category.strip())
+                            )
+                        ]
+                    )
+
                 if hasattr(client, 'query_points'):
                     response = client.query_points(
                         collection_name="diagtrace_knowledge",
                         query=query_vector,
+                        query_filter=query_filter,
                         limit=top_k
                     )
                     hits = response.points
@@ -167,6 +180,7 @@ def query_rag_context(query_text: str, query_vector: List[float], category: Opti
                     hits = client.search(
                         collection_name="diagtrace_knowledge",
                         query_vector=query_vector,
+                        query_filter=query_filter,
                         limit=top_k
                     )
                 else:

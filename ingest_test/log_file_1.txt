@@ -1,1 +1,65 @@
-mock content
+============================================================
+  VEHICLE DIAGNOSTIC REPORT - ECM (Engine Control Module)
+  Program: Alpha Series | Date: 2026-07-15
+============================================================
+
+[2026-07-15 08:23:14] VIN: 1FTRX8L70NKE33201
+  MODULE: ECM (Engine)
+  DTC Code: P0101
+  Description: Mass Air Flow Sensor Circuit Range/Performance
+  Severity: WARNING
+  Status: Open
+  Notes: MAF sensor reading erratic at idle. Voltage oscillating between 0.8V and 2.3V.
+         Possible contamination or wiring harness issue at connector C112.
+
+[2026-07-15 09:41:27] VIN: 1FTRX8L70NKE33201
+  MODULE: ECM (Engine)
+  DTC Code: P0300
+  Description: Random/Multiple Cylinder Misfire Detected
+  Severity: CRITICAL
+  Status: New
+  Notes: Misfire detected across cylinders 2, 4, and 6 under load conditions.
+         RPM fluctuation of +/- 150 RPM observed at 2500 RPM steady state.
+         Fuel injector pulse width nominal. Ignition coil resistance within spec.
+
+[2026-07-15 10:15:03] VIN: 1FTBW1EF5NFA47832
+  MODULE: ECM (Engine)
+  DTC Code: P0171
+  Description: System Too Lean (Bank 1)
+  Severity: WARNING
+  Status: In Progress
+  Notes: Long-term fuel trim (LTFT) reading +18% on Bank 1.
+         Short-term fuel trim compensating. Vacuum leak suspected at intake manifold gasket.
+         O2 sensor upstream reading 0.12V consistently lean.
+
+[2026-07-15 11:02:55] VIN: 1FTBW1EF5NFA47832
+  MODULE: ECM (Engine)
+  DTC Code: P0420
+  Description: Catalyst System Efficiency Below Threshold
+  Severity: WARNING
+  Status: Under Investigation
+  Notes: Downstream O2 sensor switching frequency approaching upstream sensor pattern.
+         Catalyst monitor readiness flag set. Mileage: 87,432 miles.
+         Cross-referencing with TSB 21-2299 for catalyst degradation on 3.5L V6.
+
+[2026-07-15 13:30:18] VIN: 1FTEW1EP0NKD82945
+  MODULE: ECM (Engine)
+  DTC Code: P0300
+  Description: Random/Multiple Cylinder Misfire Detected
+  Severity: CRITICAL
+  Status: New
+  Notes: Intermittent misfire logged during cold start sequence (-5°C ambient).
+         Freeze frame data captured: Engine coolant temp 12°C, intake air temp -3°C.
+         Spark plug gap measured at 0.044" (spec: 0.028-0.032").
+
+[2026-07-15 14:22:41] VIN: 1FTEW1EP0NKD82945
+  MODULE: ECM (Engine)
+  DTC Code: P0101
+  Description: Mass Air Flow Sensor Circuit Range/Performance
+  Severity: WARNING
+  Status: Open
+  Notes: MAF sensor output flatlines at 4.2V above 4500 RPM.
+         Air filter inspected - moderate restriction observed.
+         Recommend MAF sensor cleaning with CRC MAF cleaner and retest.
+
+--- END OF LOG FILE 1 ---
