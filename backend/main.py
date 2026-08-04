@@ -426,6 +426,62 @@ def update_ai_settings(payload: AISettingsRequest):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to update AI settings: {str(e)}")
 
+@app.post("/api/settings/ai/test")
+def test_ai_settings(payload: AISettingsRequest):
+    import requests
+    from backend.nvidia_client import NVIDIA_BASE_URL
+    results = []
+
+    # 1. Test NVIDIA LLM
+    try:
+        if payload.nvidia_api_key and not payload.nvidia_api_key.startswith("nvapi-your"):
+            headers = {"Authorization": f"Bearer {payload.nvidia_api_key}", "Content-Type": "application/json"}
+            res = requests.post(f"{NVIDIA_BASE_URL}/chat/completions", headers=headers, json={
+                "model": payload.nvidia_model or "meta/llama-3.3-70b-instruct",
+                "messages": [{"role": "user", "content": "Test"}],
+                "max_tokens": 5
+            }, timeout=10)
+            if res.status_code == 200:
+                results.append("✅ NVIDIA LLM: Success")
+            else:
+                results.append(f"❌ NVIDIA LLM: {res.status_code}")
+        else:
+            results.append("⚠️ NVIDIA LLM: Key missing")
+    except Exception as e:
+        results.append(f"❌ NVIDIA LLM: {str(e)}")
+
+    # 2. Test NVIDIA Embed
+    try:
+        if payload.nvidia_api_key and not payload.nvidia_api_key.startswith("nvapi-your"):
+            headers = {"Authorization": f"Bearer {payload.nvidia_api_key}", "Content-Type": "application/json"}
+            res = requests.post(f"{NVIDIA_BASE_URL}/embeddings", headers=headers, json={
+                "input": ["test"],
+                "model": payload.nvidia_embed_model or "nvidia/nv-embedqa-e5-v5",
+                "input_type": "query"
+            }, timeout=10)
+            if res.status_code == 200:
+                results.append("✅ NVIDIA Embed: Success")
+            else:
+                results.append(f"❌ NVIDIA Embed: {res.status_code}")
+        else:
+            results.append("⚠️ NVIDIA Embed: Key missing")
+    except Exception as e:
+        results.append(f"❌ NVIDIA Embed: {str(e)}")
+
+    # 3. Test Qdrant
+    try:
+        if payload.qdrant_url and payload.qdrant_api_key and not payload.qdrant_api_key.startswith("your-"):
+            from qdrant_client import QdrantClient
+            client = QdrantClient(url=payload.qdrant_url, api_key=payload.qdrant_api_key, timeout=5.0)
+            client.get_collections()
+            results.append("✅ Qdrant DB: Success")
+        else:
+            results.append("⚠️ Qdrant DB: Missing URL/Key")
+    except Exception as e:
+        results.append(f"❌ Qdrant DB: {str(e)}")
+
+    return {"status": "success", "results": results}
+
 # Mount frontend files
 frontend_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "frontend")
 if os.path.exists(frontend_dir):

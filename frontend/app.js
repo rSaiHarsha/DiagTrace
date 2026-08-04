@@ -108,6 +108,7 @@ const elements = {
     settingNvidiaKey: document.getElementById('setting-nvidia-key'),
     settingQdrantUrl: document.getElementById('setting-qdrant-url'),
     settingQdrantKey: document.getElementById('setting-qdrant-key'),
+    btnTestAiSettings: document.getElementById('btn-test-ai-settings'),
     
     // AI RCA & RAG & Chatbot
     btnRunRca: document.getElementById('btn-run-rca'),
@@ -244,6 +245,7 @@ function setupEventListeners() {
         });
     }
     if (elements.aiSettingsForm) elements.aiSettingsForm.addEventListener('submit', handleAiSettingsSubmit);
+    if (elements.btnTestAiSettings) elements.btnTestAiSettings.addEventListener('click', handleAiSettingsTest);
     
     // AI RCA & RAG Knowledge Base Controls
     if (elements.btnRunRca) elements.btnRunRca.addEventListener('click', runAiRcaAnalysis);
@@ -693,6 +695,52 @@ function handleAiSettingsSubmit(e) {
     })
     .catch(err => {
         showToast(`Failed to update AI settings: ${err.message}`, 'warning');
+    });
+}
+
+function handleAiSettingsTest() {
+    if (!elements.btnTestAiSettings) return;
+    const originalText = elements.btnTestAiSettings.innerText;
+    elements.btnTestAiSettings.innerText = "Testing...";
+    elements.btnTestAiSettings.disabled = true;
+
+    let modelName = elements.settingLlmModel.value;
+    if (modelName === 'custom') {
+        modelName = elements.settingCustomModel.value.trim();
+    }
+    const embedModel = elements.settingEmbedModel.value;
+    const nvidiaKey = elements.settingNvidiaKey.value.trim();
+    const qdrantUrl = elements.settingQdrantUrl.value.trim();
+    const qdrantKey = elements.settingQdrantKey.value.trim();
+
+    fetch('/api/settings/ai/test', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            nvidia_api_key: nvidiaKey ? nvidiaKey : undefined,
+            nvidia_model: modelName,
+            nvidia_embed_model: embedModel,
+            qdrant_url: qdrantUrl ? qdrantUrl : undefined,
+            qdrant_api_key: qdrantKey ? qdrantKey : undefined
+        })
+    })
+    .then(async res => {
+        const data = await res.json();
+        elements.btnTestAiSettings.innerText = originalText;
+        elements.btnTestAiSettings.disabled = false;
+        
+        if (!res.ok) {
+            throw new Error(data.detail || 'Test request failed');
+        }
+        
+        if (data.results && data.results.length > 0) {
+            alert("Test Results:\n\n" + data.results.join("\n\n"));
+        }
+    })
+    .catch(err => {
+        elements.btnTestAiSettings.innerText = originalText;
+        elements.btnTestAiSettings.disabled = false;
+        showToast(`Failed to test AI settings: ${err.message}`, 'warning');
     });
 }
 
