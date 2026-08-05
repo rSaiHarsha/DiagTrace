@@ -438,7 +438,7 @@ def test_ai_settings(payload: AISettingsRequest):
                 "model": payload.nvidia_model or "meta/llama-3.3-70b-instruct",
                 "messages": [{"role": "user", "content": "Test"}],
                 "max_tokens": 5
-            }, timeout=30)
+            }, timeout=300)
             if res.status_code == 200:
                 results.append("✅ NVIDIA LLM: Success")
             else:
