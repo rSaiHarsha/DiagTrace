@@ -73,7 +73,7 @@ def query_nvidia_llm(prompt: str, system_prompt: Optional[str] = None, temperatu
 
     # Model candidates in order of preference (Primary configured + robust NIM fallbacks)
     candidate_models = [primary_model]
-    for alt_model in ["qwen/qwen2.5-72b-instruct", "nvidia/nemotron-4-49b-instruct", "nvidia/nemotron-4-340b-instruct", "qwen/qwen2.5-coder-32b-instruct"]:
+    for alt_model in ["nvidia/nemotron-4-49b-instruct"]:
         if alt_model not in candidate_models:
             candidate_models.append(alt_model)
 
