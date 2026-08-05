@@ -73,7 +73,7 @@ const elements = {
     signinPassword: document.getElementById('signin-password'),
     signinError: document.getElementById('signin-error'),
     linkGotoSignup: document.getElementById('link-goto-signup'),
-    tabGotoSignup: document.getElementById('tab-goto-signup'),
+
     
     
     signupModal: document.getElementById('signup-modal'),
