@@ -98,12 +98,16 @@ Assumptions to verify against your actual schema:
     are used opportunistically (co-occurrence + trend); code degrades
     gracefully if they're absent, but you'll get a materially better
     report if Timestamp is present and parquet-parseable.
-  - `query_nvidia_llm(prompt, temperature=..., max_tokens=...)` takes a
-    single prompt string and returns text. If your nvidia_client actually
-    supports OpenAI-style structured tool calling via NIM, that's a
-    cleaner way to implement the loop below than the JSON-in-text
-    protocol used here -- worth checking, since it removes the need for
-    `_parse_agent_json`'s regex extraction entirely.
+  - `query_nvidia_llm(prompt, system_prompt=None, temperature=..., max_tokens=...)`
+    is used here with the agent protocol passed as `system_prompt` and the
+    dataset/context as `prompt`, matching backend/nvidia_client.py's actual
+    signature. If you later add real OpenAI-style tool calling on the NIM
+    side, that would replace the JSON-in-text protocol below more robustly
+    than `_parse_agent_json`'s parsing.
+  - Column names are resolved dynamically (see `_COLUMN_CANDIDATES`)
+    against whatever your `load_from_db()` dataframe actually uses --
+    Title Case ("Module") or snake_case ("module") -- since that wasn't
+    fully consistent across the files you shared.
 """
 
 import json
@@ -122,6 +126,40 @@ RAG_TOP_K_PER_QUERY = 3
 RAG_MAX_TOTAL_DOCS = 10
 COOCCURRENCE_WINDOW_SECONDS = 5
 
+# Logical field -> acceptable column name variants actually seen across this
+# codebase (parser.py/database.py use lowercase snake_case for storage;
+# chatbot_engine.py/rca_engine.py references so far assume Title Case). We
+# resolve against whichever is actually present instead of hardcoding one,
+# so a naming mismatch degrades gracefully instead of throwing a KeyError.
+_COLUMN_CANDIDATES = {
+    "module": ["Module", "module"],
+    "code": ["Code", "code"],
+    "issue_status": ["Issue Status", "issue_status", "Issue_Status", "status"],
+    "severity": ["Severity", "severity"],
+    "timestamp": ["Timestamp", "timestamp"],
+}
+
+
+def _resolve_column(df: pd.DataFrame, logical_name: str) -> Optional[str]:
+    for candidate in _COLUMN_CANDIDATES.get(logical_name, []):
+        if candidate in df.columns:
+            return candidate
+    return None
+
+
+def _json_safe_value_counts(df: pd.DataFrame, column: Optional[str]) -> Dict[str, int]:
+    """
+    value_counts().to_dict() returns numpy.int64 values, which json.dumps()
+    cannot serialize (TypeError: Object of type int64 is not JSON
+    serializable). Cast everything to native str/int so this can safely be
+    passed through json.dumps() when building prompts, and through
+    FastAPI's response serialization if ever returned directly.
+    """
+    if column is None or column not in df.columns:
+        return {}
+    counts = df[column].value_counts()
+    return {str(k): int(v) for k, v in counts.items()}
+
 
 # ---------------------------------------------------------------------------
 # 1. Deterministic feature extraction from the diagnostic dataset
@@ -129,34 +167,34 @@ COOCCURRENCE_WINDOW_SECONDS = 5
 
 def _build_diagnostic_features(df: pd.DataFrame) -> Dict[str, Any]:
     """Cheap, reliable structure extraction that also shapes what we search for."""
-    features: Dict[str, Any] = {"total_records": len(df)}
+    features: Dict[str, Any] = {"total_records": int(len(df))}
 
-    features["modules_count"] = (
-        df["Module"].value_counts().to_dict() if "Module" in df.columns else {}
-    )
-    features["codes_count"] = (
-        df["Code"].value_counts().to_dict() if "Code" in df.columns else {}
-    )
-    features["status_count"] = (
-        df["Issue Status"].value_counts().to_dict()
-        if "Issue Status" in df.columns
-        else {}
-    )
-    features["severity_count"] = (
-        df["Severity"].value_counts().to_dict() if "Severity" in df.columns else {}
-    )
+    module_col = _resolve_column(df, "module")
+    code_col = _resolve_column(df, "code")
+    status_col = _resolve_column(df, "issue_status")
+    severity_col = _resolve_column(df, "severity")
+    timestamp_col = _resolve_column(df, "timestamp")
+
+    features["modules_count"] = _json_safe_value_counts(df, module_col)
+    features["codes_count"] = _json_safe_value_counts(df, code_col)
+    features["status_count"] = _json_safe_value_counts(df, status_col)
+    features["severity_count"] = _json_safe_value_counts(df, severity_col)
 
     features["top_modules"] = list(features["modules_count"].keys())[:5]
     features["top_codes"] = list(features["codes_count"].keys())[:5]
 
-    features["cooccurring_events"] = _detect_cooccurring_events(df)
-    features["weekly_trend"] = _build_weekly_trend(df)
+    features["cooccurring_events"] = _detect_cooccurring_events(df, module_col, code_col, timestamp_col)
+    features["weekly_trend"] = _build_weekly_trend(df, timestamp_col)
 
     return features
 
 
 def _detect_cooccurring_events(
-    df: pd.DataFrame, window_seconds: int = COOCCURRENCE_WINDOW_SECONDS
+    df: pd.DataFrame,
+    module_col: Optional[str],
+    code_col: Optional[str],
+    timestamp_col: Optional[str],
+    window_seconds: int = COOCCURRENCE_WINDOW_SECONDS,
 ) -> List[Dict[str, Any]]:
     """
     Clusters records whose timestamps fall within `window_seconds` of each
@@ -165,25 +203,27 @@ def _detect_cooccurring_events(
     shared power) rather than independent failures -- e.g. simultaneous
     U0100/U0121 across ECM/TCM/ABS pointing at one BCM gateway event.
     """
-    if "Timestamp" not in df.columns or "Module" not in df.columns:
+    if timestamp_col is None or module_col is None:
         return []
 
     working = df.copy()
-    working["Timestamp"] = pd.to_datetime(working["Timestamp"], errors="coerce")
-    working = working.dropna(subset=["Timestamp"]).sort_values("Timestamp")
+    working["_ts"] = pd.to_datetime(working[timestamp_col], errors="coerce")
+    working = working.dropna(subset=["_ts"]).sort_values("_ts")
+    if working.empty:
+        return []
 
     clusters: List[Dict[str, Any]] = []
     current: List[pd.Series] = []
 
     def flush(bucket: List[pd.Series]):
-        if len(bucket) >= 2 and len({r["Module"] for r in bucket}) >= 2:
-            clusters.append(_summarize_cluster(bucket))
+        if len(bucket) >= 2 and len({r[module_col] for r in bucket}) >= 2:
+            clusters.append(_summarize_cluster(bucket, module_col, code_col))
 
     for _, row in working.iterrows():
         if not current:
             current = [row]
             continue
-        if (row["Timestamp"] - current[-1]["Timestamp"]) <= timedelta(seconds=window_seconds):
+        if (row["_ts"] - current[-1]["_ts"]) <= timedelta(seconds=window_seconds):
             current.append(row)
         else:
             flush(current)
@@ -193,25 +233,27 @@ def _detect_cooccurring_events(
     return clusters[:5]  # cap so a noisy dataset doesn't dominate the prompt
 
 
-def _summarize_cluster(rows: List[pd.Series]) -> Dict[str, Any]:
+def _summarize_cluster(
+    rows: List[pd.Series], module_col: str, code_col: Optional[str]
+) -> Dict[str, Any]:
     return {
-        "start_time": str(rows[0]["Timestamp"]),
-        "end_time": str(rows[-1]["Timestamp"]),
-        "modules": sorted({r["Module"] for r in rows}),
-        "codes": sorted({r.get("Code", "?") for r in rows}),
-        "count": len(rows),
+        "start_time": str(rows[0]["_ts"]),
+        "end_time": str(rows[-1]["_ts"]),
+        "modules": sorted({str(r[module_col]) for r in rows}),
+        "codes": sorted({str(r[code_col]) for r in rows}) if code_col else [],
+        "count": int(len(rows)),
     }
 
 
-def _build_weekly_trend(df: pd.DataFrame) -> Dict[str, int]:
-    if "Timestamp" not in df.columns:
+def _build_weekly_trend(df: pd.DataFrame, timestamp_col: Optional[str]) -> Dict[str, int]:
+    if timestamp_col is None:
         return {}
     working = df.copy()
-    working["Timestamp"] = pd.to_datetime(working["Timestamp"], errors="coerce")
-    working = working.dropna(subset=["Timestamp"])
+    working["_ts"] = pd.to_datetime(working[timestamp_col], errors="coerce")
+    working = working.dropna(subset=["_ts"])
     if working.empty:
         return {}
-    weekly = working.set_index("Timestamp").resample("W").size()
+    weekly = working.set_index("_ts").resample("W").size()
     return {str(k.date()): int(v) for k, v in weekly.items()}
 
 
@@ -307,15 +349,25 @@ even if context is incomplete -- note any remaining gaps explicitly in the repor
 
 
 def _parse_agent_json(raw_response: str) -> Optional[Dict[str, Any]]:
-    """LLMs love wrapping JSON in prose/code fences. Extract the first {...} block."""
+    """
+    LLMs love wrapping JSON in prose/code fences, and since our JSON's
+    report_markdown field can itself contain curly braces (code samples,
+    set notation, etc.), a naive greedy brace-to-brace regex can grab the
+    wrong span. json.JSONDecoder().raw_decode() parses the first *valid*
+    JSON value starting at the first opening brace and ignores anything
+    trailing it, which is more robust here.
+    """
     cleaned = raw_response.strip()
     cleaned = re.sub(r"^```(json)?", "", cleaned).strip()
     cleaned = re.sub(r"```$", "", cleaned).strip()
-    match = re.search(r"\{.*\}", cleaned, re.DOTALL)
-    if not match:
+
+    start = cleaned.find("{")
+    if start == -1:
         return None
+
     try:
-        return json.loads(match.group(0))
+        obj, _ = json.JSONDecoder().raw_decode(cleaned[start:])
+        return obj if isinstance(obj, dict) else None
     except json.JSONDecodeError:
         return None
 
@@ -332,9 +384,13 @@ def _run_agentic_analysis(
     )
 
     def build_turn_prompt(turn: int) -> str:
-        return f"""{system_prompt}
-
-### Diagnostic Dataset Summary
+        # Note: the agent protocol itself lives in `system_prompt` and is
+        # passed via query_nvidia_llm's dedicated system_prompt parameter
+        # (see nvidia_client.query_nvidia_llm) rather than concatenated in
+        # here -- keeps the instruction/context separation the NIM chat
+        # template expects, and avoids the client's own default persona
+        # string silently taking over if we leave system_prompt unset.
+        return f"""### Diagnostic Dataset Summary
 - Total Records: {features['total_records']}
 - Top Modules: {json.dumps(features['modules_count'])}
 - Top DTC Codes: {json.dumps(features['codes_count'])}
@@ -353,7 +409,10 @@ Respond with your next action as specified in the system instructions.
     for turn in range(MAX_AGENT_ITERATIONS):
         try:
             raw_response = query_nvidia_llm(
-                build_turn_prompt(turn), temperature=0.1, max_tokens=1800
+                build_turn_prompt(turn),
+                system_prompt=system_prompt,
+                temperature=0.1,
+                max_tokens=1800,
             )
         except Exception as e:
             return {
@@ -396,10 +455,8 @@ Respond with your next action as specified in the system instructions.
                     docs.append(doc)
 
     # Exhausted iterations without a "final" -- force one last synthesis call.
-    final_prompt = f"""{system_prompt}
-
-You are out of search turns. Using everything retrieved so far, respond with ONLY \
-the {{"action": "final", "report_markdown": "..."}} JSON object.
+    final_prompt = f"""You are out of search turns. Using everything retrieved so far, \
+respond with ONLY the {{"action": "final", "report_markdown": "..."}} JSON object.
 
 ### Knowledge Base Context
 {_format_rag_context(docs)}
@@ -412,7 +469,9 @@ the {{"action": "final", "report_markdown": "..."}} JSON object.
 - Weekly Trend: {json.dumps(features['weekly_trend'])}
 """
     try:
-        raw_response = query_nvidia_llm(final_prompt, temperature=0.1, max_tokens=1800)
+        raw_response = query_nvidia_llm(
+            final_prompt, system_prompt=system_prompt, temperature=0.1, max_tokens=1800
+        )
         parsed = _parse_agent_json(raw_response)
         report = parsed.get("report_markdown", raw_response) if parsed else raw_response
     except Exception as e:
@@ -462,3 +521,5 @@ def run_ai_rca_analysis() -> Dict[str, Any]:
 def get_weekly_ai_summary() -> Dict[str, Any]:
     """Generates a trend-focused executive weekly summary (distinct report shape from RCA)."""
     return _run(mode="weekly_summary")
+
+
