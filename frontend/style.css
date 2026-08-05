@@ -117,23 +117,34 @@ body {
     transition: background-color 0.3s ease, color 0.3s ease;
 }
 
-/* Scrollbar customizations */
+/* Sleek Micro Scrollbar Design System for All Dialogs & Containers */
+* {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(59, 130, 246, 0.4) transparent;
+}
+
 ::-webkit-scrollbar {
-    width: 8px;
-    height: 8px;
+    width: 5px;
+    height: 5px;
 }
 
 ::-webkit-scrollbar-track {
-    background: rgba(0, 0, 0, 0.05);
+    background: transparent;
+    border-radius: 10px;
 }
 
 ::-webkit-scrollbar-thumb {
-    background: var(--text-muted);
-    border-radius: 4px;
+    background: rgba(59, 130, 246, 0.35);
+    border-radius: 10px;
+    transition: background 0.2s ease, transform 0.2s ease;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-    background: var(--text-secondary);
+    background: var(--primary);
+}
+
+::-webkit-scrollbar-corner {
+    background: transparent;
 }
 
 /* Header Styles */
@@ -1875,6 +1886,14 @@ custom-dropdown, .custom-dropdown {
     max-height: 85vh;
     display: flex;
     flex-direction: column;
+    overflow: hidden;
+}
+
+.rca-modal-body {
+    flex: 1;
+    overflow-y: auto;
+    max-height: calc(85vh - 75px);
+    padding: 20px 24px;
 }
 
 .rca-loading {

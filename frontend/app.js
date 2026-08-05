@@ -12,7 +12,8 @@ let appState = {
     activeTab: "server",
     currentUser: null,
     authToken: localStorage.getItem('diagtrace_token') || null,
-    currentTheme: localStorage.getItem('diagtrace_theme') || 'white'
+    currentTheme: localStorage.getItem('diagtrace_theme') || 'white',
+    lastRcaMarkdown: ""
 };
 
 // Global Chart.js Instances
@@ -106,12 +107,22 @@ const elements = {
     settingCustomModel: document.getElementById('setting-custom-model'),
     settingEmbedModel: document.getElementById('setting-embed-model'),
     settingNvidiaKey: document.getElementById('setting-nvidia-key'),
+    btnToggleNvidiaKey: document.getElementById('btn-toggle-nvidia-key'),
     settingQdrantUrl: document.getElementById('setting-qdrant-url'),
     settingQdrantKey: document.getElementById('setting-qdrant-key'),
+    btnToggleQdrantKey: document.getElementById('btn-toggle-qdrant-key'),
     btnTestAiSettings: document.getElementById('btn-test-ai-settings'),
     
     // AI RCA & RAG & Chatbot
     btnRunRca: document.getElementById('btn-run-rca'),
+    btnDownloadRca: document.getElementById('btn-download-rca'),
+    btnDockRca: document.getElementById('btn-dock-rca'),
+    dockedRcaWidget: document.getElementById('docked-rca-widget'),
+    dockedRcaStatusText: document.getElementById('docked-rca-status-text'),
+    dockedRcaProgressBar: document.getElementById('docked-rca-progress-bar'),
+    btnMaximizeDockedRca: document.getElementById('btn-maximize-docked-rca'),
+    btnCloseDockedRca: document.getElementById('btn-close-docked-rca'),
+    dockedRcaBody: document.getElementById('docked-rca-body'),
     btnOpenRag: document.getElementById('btn-open-rag'),
     rcaModal: document.getElementById('rca-modal'),
     rcaClose: document.getElementById('rca-close'),
@@ -246,9 +257,28 @@ function setupEventListeners() {
     }
     if (elements.aiSettingsForm) elements.aiSettingsForm.addEventListener('submit', handleAiSettingsSubmit);
     if (elements.btnTestAiSettings) elements.btnTestAiSettings.addEventListener('click', handleAiSettingsTest);
+    if (elements.btnToggleNvidiaKey) {
+        elements.btnToggleNvidiaKey.addEventListener('click', () => {
+            if (elements.settingNvidiaKey) {
+                elements.settingNvidiaKey.type = elements.settingNvidiaKey.type === 'password' ? 'text' : 'password';
+            }
+        });
+    }
+    if (elements.btnToggleQdrantKey) {
+        elements.btnToggleQdrantKey.addEventListener('click', () => {
+            if (elements.settingQdrantKey) {
+                elements.settingQdrantKey.type = elements.settingQdrantKey.type === 'password' ? 'text' : 'password';
+            }
+        });
+    }
     
     // AI RCA & RAG Knowledge Base Controls
     if (elements.btnRunRca) elements.btnRunRca.addEventListener('click', runAiRcaAnalysis);
+    if (elements.btnDownloadRca) elements.btnDownloadRca.addEventListener('click', downloadRcaReport);
+    if (elements.btnDockRca) elements.btnDockRca.addEventListener('click', dockRcaModal);
+    if (elements.btnMaximizeDockedRca) elements.btnMaximizeDockedRca.addEventListener('click', maximizeRcaDock);
+    if (elements.btnCloseDockedRca) elements.btnCloseDockedRca.addEventListener('click', closeRcaDock);
+    if (elements.dockedRcaBody) elements.dockedRcaBody.addEventListener('click', maximizeRcaDock);
     if (elements.btnOpenRag) elements.btnOpenRag.addEventListener('click', openRagModal);
     if (elements.rcaClose) elements.rcaClose.addEventListener('click', closeRcaModal);
     if (elements.ragClose) elements.ragClose.addEventListener('click', closeRagModal);
@@ -617,7 +647,7 @@ function closeProfileModal() {
 
 function openSettingsModal() {
     applyTheme(appState.currentTheme);
-    fetchAiSettings();
+    switchSettingsTab('ai');
     if (elements.settingsModal) elements.settingsModal.classList.remove('hidden');
 }
 
@@ -657,7 +687,9 @@ function fetchAiSettings() {
         }
 
         if (elements.settingEmbedModel) elements.settingEmbedModel.value = data.nvidia_embed_model || 'nvidia/nv-embedqa-e5-v5';
+        if (elements.settingNvidiaKey) elements.settingNvidiaKey.value = data.nvidia_api_key || '';
         if (elements.settingQdrantUrl) elements.settingQdrantUrl.value = data.qdrant_url || '';
+        if (elements.settingQdrantKey) elements.settingQdrantKey.value = data.qdrant_api_key || '';
     })
     .catch(() => {});
 }
@@ -687,10 +719,6 @@ function handleAiSettingsSubmit(e) {
     .then(res => res.json())
     .then(data => {
         showToast("Information is stored successfully!");
-        if (elements.settingNvidiaKey) elements.settingNvidiaKey.value = '';
-        if (elements.settingQdrantKey) elements.settingQdrantKey.value = '';
-        if (elements.settingQdrantUrl) elements.settingQdrantUrl.value = '';
-        if (elements.settingCustomModel) elements.settingCustomModel.value = '';
         fetchAiSettings();
     })
     .catch(err => {
@@ -701,7 +729,7 @@ function handleAiSettingsSubmit(e) {
 function handleAiSettingsTest() {
     if (!elements.btnTestAiSettings) return;
     const originalText = elements.btnTestAiSettings.innerText;
-    elements.btnTestAiSettings.innerText = "Testing...";
+    elements.btnTestAiSettings.innerText = "⚡ Testing (up to 30s)...";
     elements.btnTestAiSettings.disabled = true;
 
     let modelName = elements.settingLlmModel.value;
@@ -2112,19 +2140,60 @@ function closeChartDialog() {
 // ----------------------------------------------------
 // AI Root Cause Analysis (RCA) & RAG Knowledge Base
 // ----------------------------------------------------
+function dockRcaModal() {
+    if (elements.rcaModal) elements.rcaModal.classList.add('hidden');
+    if (elements.dockedRcaWidget) elements.dockedRcaWidget.classList.remove('hidden');
+}
+
+function maximizeRcaDock() {
+    if (elements.dockedRcaWidget) elements.dockedRcaWidget.classList.add('hidden');
+    if (elements.rcaModal) elements.rcaModal.classList.remove('hidden');
+}
+
+function closeRcaDock() {
+    if (elements.dockedRcaWidget) elements.dockedRcaWidget.classList.add('hidden');
+}
+
+function updateRcaStatusUI(status, message) {
+    if (elements.dockedRcaStatusText) elements.dockedRcaStatusText.innerText = message;
+    if (elements.dockedRcaProgressBar) {
+        if (status === 'running') {
+            elements.dockedRcaProgressBar.style.width = '45%';
+            elements.dockedRcaProgressBar.style.backgroundColor = 'var(--primary)';
+        } else if (status === 'completed') {
+            elements.dockedRcaProgressBar.style.width = '100%';
+            elements.dockedRcaProgressBar.style.backgroundColor = '#10b981';
+        } else if (status === 'error') {
+            elements.dockedRcaProgressBar.style.width = '100%';
+            elements.dockedRcaProgressBar.style.backgroundColor = '#ef4444';
+        }
+    }
+}
+
 function runAiRcaAnalysis() {
     if (elements.rcaModal) elements.rcaModal.classList.remove('hidden');
     if (elements.rcaLoading) elements.rcaLoading.classList.remove('hidden');
     if (elements.rcaReportBody) elements.rcaReportBody.innerHTML = '';
+    if (elements.btnDownloadRca) elements.btnDownloadRca.classList.add('hidden');
+
+    updateRcaStatusUI('running', '⚡ Synthesizing RCA report (DTC Trends + RAG)...');
 
     fetch('/api/ai/rca', { method: 'POST' })
     .then(res => res.json())
     .then(data => {
         if (elements.rcaLoading) elements.rcaLoading.classList.add('hidden');
         if (data.status === 'success' && elements.rcaReportBody) {
+            appState.lastRcaMarkdown = data.report_markdown || '';
             elements.rcaReportBody.innerHTML = renderMarkdownSimple(data.report_markdown);
+            if (elements.btnDownloadRca && data.report_markdown) {
+                elements.btnDownloadRca.classList.remove('hidden');
+            }
+            updateRcaStatusUI('completed', '🎉 RCA Report Generated! (Click to View)');
+            showToast('🎉 AI Root Cause Analysis Report Generated!');
         } else if (elements.rcaReportBody) {
-            elements.rcaReportBody.innerHTML = `<p class="auth-error-msg">${data.message || 'Failed to run RCA analysis.'}</p>`;
+            const errMsg = data.message || 'Failed to run RCA analysis.';
+            elements.rcaReportBody.innerHTML = `<p class="auth-error-msg">${errMsg}</p>`;
+            updateRcaStatusUI('error', `❌ RCA Failed: ${errMsg}`);
         }
     })
     .catch(err => {
@@ -2132,7 +2201,27 @@ function runAiRcaAnalysis() {
         if (elements.rcaReportBody) {
             elements.rcaReportBody.innerHTML = `<p class="auth-error-msg">Error running RCA: ${err.message}</p>`;
         }
+        updateRcaStatusUI('error', `❌ RCA Error: ${err.message}`);
     });
+}
+
+function downloadRcaReport() {
+    if (!appState.lastRcaMarkdown) {
+        showToast("No RCA report content available to download.", "warning");
+        return;
+    }
+    const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+    const filename = `AI_RCA_Diagnostic_Report_${timestamp}.md`;
+    const blob = new Blob([appState.lastRcaMarkdown], { type: 'text/markdown;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+    showToast(`Downloaded RCA Report (${filename})`);
 }
 
 function closeRcaModal() {
@@ -2423,9 +2512,11 @@ function appendChatMessage(sender, htmlContent, msgId = null) {
     msgDiv.className = `chat-message ${sender}`;
     if (msgId) msgDiv.id = msgId;
 
-    const avatarHtml = sender === 'bot' ? '🤖' : '👤';
+    const avatarHtml = sender === 'bot' 
+        ? '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="16" rx="2" ry="2"></rect><rect x="9" y="9" width="6" height="6"></rect><line x1="9" y1="1" x2="9" y2="4"></line><line x1="15" y1="1" x2="15" y2="4"></line><line x1="9" y1="20" x2="9" y2="23"></line><line x1="15" y1="20" x2="15" y2="23"></line><line x1="20" y1="9" x2="23" y2="9"></line><line x1="20" y1="15" x2="23" y2="15"></line><line x1="1" y1="9" x2="4" y2="9"></line><line x1="1" y1="15" x2="4" y2="15"></line></svg>'
+        : '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>';
     msgDiv.innerHTML = `
-        <div class="msg-avatar">${avatarHtml}</div>
+        <div class="msg-avatar" style="display: flex; align-items: center; justify-content: center;">${avatarHtml}</div>
         <div class="msg-bubble">${htmlContent}</div>
     `;
     elements.chatHistory.appendChild(msgDiv);

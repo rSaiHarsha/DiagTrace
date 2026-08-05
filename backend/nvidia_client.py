@@ -49,10 +49,12 @@ def set_nvidia_ai_config(api_key: Optional[str] = None, model_name: Optional[str
     except Exception as e:
         print(f"Failed to update .env: {e}")
 
+import time
+
 def query_nvidia_llm(prompt: str, system_prompt: Optional[str] = None, temperature: float = 0.2, max_tokens: int = 1500) -> str:
-    """Queries NVIDIA NIM API for LLM completion. Raises explicit error on failure."""
+    """Queries NVIDIA NIM API for LLM completion with automatic 503 retries and fallback model support."""
     api_key = get_nvidia_api_key()
-    model = get_nvidia_model()
+    primary_model = get_nvidia_model()
     
     if not api_key or api_key.startswith("nvapi-your-key"):
         raise RuntimeError("NVIDIA_API_KEY is missing or invalid. Please enter your valid NVIDIA API Key in Settings (⚙️ Settings -> 🤖 AI Models & Keys).")
@@ -68,35 +70,67 @@ def query_nvidia_llm(prompt: str, system_prompt: Optional[str] = None, temperatu
         "Content-Type": "application/json",
         "Accept": "application/json"
     }
-    payload = {
-        "model": model,
-        "messages": [
-            {"role": "system", "content": system_prompt},
-            {"role": "user", "content": prompt}
-        ],
-        "temperature": temperature,
-        "max_tokens": max_tokens,
-        "stream": False
-    }
+
+    # Model candidates in order of preference (Primary configured + robust NIM fallbacks)
+    candidate_models = [primary_model]
+    for alt_model in ["qwen/qwen2.5-72b-instruct", "nvidia/nemotron-4-49b-instruct", "nvidia/nemotron-4-340b-instruct", "qwen/qwen2.5-coder-32b-instruct"]:
+        if alt_model not in candidate_models:
+            candidate_models.append(alt_model)
+
+    last_error_msg = ""
     
-    try:
-        res = requests.post(f"{NVIDIA_BASE_URL}/chat/completions", headers=headers, json=payload, timeout=550)
-        if res.status_code == 200:
-            data = res.json()
-            if "choices" in data and len(data["choices"]) > 0:
-                return data["choices"][0]["message"]["content"].strip()
-            raise RuntimeError(f"NVIDIA API returned empty choices payload: {res.text}")
-        else:
+    for current_model in candidate_models:
+        payload = {
+            "model": current_model,
+            "messages": [
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": prompt}
+            ],
+            "temperature": temperature,
+            "max_tokens": max_tokens,
+            "stream": False
+        }
+
+        # Attempt up to 3 retries per model for transient 503 / 429 / connection issues
+        for attempt in range(1, 4):
             try:
-                err_data = res.json()
-                err_msg = err_data.get("detail") or err_data.get("message") or res.text
-            except Exception:
-                err_msg = res.text
-            if res.status_code in (401, 403):
-                raise RuntimeError(f"NVIDIA API Authorization Failed (HTTP {res.status_code}): Invalid or unauthenticated API key. Please open '⚙️ Settings' -> '🤖 AI Models & Keys' to enter your valid key starting with 'nvapi-' (obtainable for free at build.nvidia.com).")
-            raise RuntimeError(f"NVIDIA API Call Failed ({res.status_code}): {err_msg}")
-    except requests.exceptions.RequestException as e:
-        raise RuntimeError(f"NVIDIA API Connection Error: {str(e)}")
+                res = requests.post(f"{NVIDIA_BASE_URL}/chat/completions", headers=headers, json=payload, timeout=60)
+                if res.status_code == 200:
+                    data = res.json()
+                    if "choices" in data and len(data["choices"]) > 0:
+                        return data["choices"][0]["message"]["content"].strip()
+                    raise RuntimeError(f"NVIDIA API returned empty choices payload: {res.text}")
+                
+                # Parse error response
+                try:
+                    err_data = res.json()
+                    err_msg = err_data.get("detail") or err_data.get("message") or res.text
+                    if isinstance(err_data.get("error"), dict) and "message" in err_data["error"]:
+                        err_msg = err_data["error"]["message"]
+                except Exception:
+                    err_msg = res.text
+                
+                last_error_msg = f"HTTP {res.status_code}: {err_msg}"
+
+                if res.status_code in (401, 403):
+                    raise RuntimeError(f"NVIDIA API Authorization Failed (HTTP {res.status_code}): Invalid or unauthenticated API key. Please open '⚙️ Settings' -> '🤖 AI Models & Keys' to enter your valid key starting with 'nvapi-'.")
+                
+                # Transient rate limit or worker queue exhaustion (503 / 429 / 504) -> retry with backoff
+                if res.status_code in (503, 429, 504, 502):
+                    wait_time = attempt * 2  # 2s, 4s, 6s
+                    print(f"⚠️ [NVIDIA API {res.status_code}] Model '{current_model}' busy ({err_msg}). Retrying in {wait_time}s (Attempt {attempt}/3)...")
+                    time.sleep(wait_time)
+                    continue
+                else:
+                    # Non-retryable HTTP error for this model, try next model candidate
+                    break
+
+            except requests.exceptions.RequestException as e:
+                last_error_msg = f"Connection Error: {str(e)}"
+                wait_time = attempt * 2
+                time.sleep(wait_time)
+
+    raise RuntimeError(f"NVIDIA API Call Failed after retries: {last_error_msg}")
 
 def get_nvidia_embedding(text: str) -> List[float]:
     """Generates embedding vector via NVIDIA Embedding NIM or fallback hash vector if key is not configured."""

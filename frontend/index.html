@@ -14,20 +14,20 @@
 <body>
     <header class="app-header">
         <div class="header-logo">
-            <span class="logo-icon">⚡</span>
+            <span class="logo-icon" style="display: flex; align-items: center;"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="color: var(--primary);"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg></span>
             <span class="logo-text">Diag<span class="highlight">Trace</span></span>
             <span class="version-badge" id="version-badge">v2.1.0</span>
         </div>
         <div class="header-status">
-            <span id="db-status" class="status-indicator connected">
-                🗄️ Database Connected
+            <span id="db-status" class="status-indicator connected" style="display: flex; align-items: center; gap: 6px;">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="5" rx="9" ry="3"></ellipse><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"></path><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"></path></svg> Database Connected
             </span>
             <div class="header-actions-group">
-                <button id="btn-header-profile" class="btn btn-secondary btn-small" title="User Profile">
-                    👤 <span id="header-profile-text">Profile</span>
+                <button id="btn-header-profile" class="btn btn-secondary btn-small" title="User Profile" style="display: flex; align-items: center; gap: 6px;">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg> <span id="header-profile-text">Profile</span>
                 </button>
-                <button id="btn-header-settings" class="btn btn-secondary btn-small" title="Settings">
-                    ⚙️ Settings
+                <button id="btn-header-settings" class="btn btn-secondary btn-small" title="Settings" style="display: flex; align-items: center; gap: 6px;">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg> Settings
                 </button>
             </div>
         </div>
@@ -43,7 +43,9 @@
                 <div class="card-header">
 
                     <div class="upload-status-group">
-                        <button id="btn-browse-folder" class="btn btn-small">+ Upload</button>
+                        <button id="btn-browse-folder" class="btn btn-small" style="display: flex; align-items: center; gap: 6px;">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg> Upload Logs
+                        </button>
                         <span id="console-spinner" class="spinner hidden">
                             <span class="css-spinner"></span> Processing
                         </span>
@@ -51,27 +53,25 @@
                                 title="Minimize/Maximize logs">-Status</button></span>
                     </div>
 
-
-
                     <div class="header-actions">
-                        <button id="btn-run-rca" class="btn btn-primary btn-small" title="Run AI Root Cause Analysis">
-                            🤖 AI Root Cause Analysis
+                        <button id="btn-run-rca" class="btn btn-primary btn-small" title="Run AI Root Cause Analysis" style="display: flex; align-items: center; gap: 6px;">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="16" rx="2" ry="2"></rect><rect x="9" y="9" width="6" height="6"></rect><line x1="9" y1="1" x2="9" y2="4"></line><line x1="15" y1="1" x2="15" y2="4"></line><line x1="9" y1="20" x2="9" y2="23"></line><line x1="15" y1="20" x2="15" y2="23"></line><line x1="20" y1="9" x2="23" y2="9"></line><line x1="20" y1="15" x2="23" y2="15"></line><line x1="1" y1="9" x2="4" y2="9"></line><line x1="1" y1="15" x2="4" y2="15"></line></svg> AI Root Cause Analysis
                         </button>
-                        <button id="btn-open-rag" class="btn btn-secondary btn-small" title="Manage RAG Knowledge Base">
-                            📚 Knowledge Base
+                        <button id="btn-open-rag" class="btn btn-secondary btn-small" title="Manage RAG Knowledge Base" style="display: flex; align-items: center; gap: 6px;">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path></svg> Knowledge Base
                         </button>
                         <button id="btn-clear-filters" class="btn btn-secondary btn-small"
-                            title="Clear all active column filters">
-                            ❌ Clear Filters
+                            title="Clear all active column filters" style="display: flex; align-items: center; gap: 6px;">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"></polygon><line x1="18" y1="18" x2="22" y2="22"></line><line x1="22" y1="18" x2="18" y2="22"></line></svg> Clear Filters
                         </button>
-                        <button id="btn-export-excel" class="btn btn-success btn-small">
-                            📄 Export to Excel
+                        <button id="btn-export-excel" class="btn btn-success btn-small" style="display: flex; align-items: center; gap: 6px;">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg> Export to Excel
                         </button>
                     </div>
                 </div>
                 <div id="log-console-container" class="log-console-container hidden">
                     <div class="console-header">
-                        <span>💻 Live Diagnostic Engine Output Logs</span>
+                        <span style="display: flex; align-items: center; gap: 8px;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="4 17 10 11 4 5"></polyline><line x1="12" y1="19" x2="20" y2="19"></line></svg> Live Diagnostic Engine Output Logs</span>
                         <div class="console-header-actions">
                             <span id="console-spinner" class="spinner hidden"><span class="css-spinner"></span>
                                 Processing</span>
@@ -462,12 +462,72 @@
                 <p style="font-size: 0.85rem; color: var(--text-secondary); margin: 0;">Customize your DiagTrace experience</p>
             </div>
             <div class="settings-tabs-header" style="padding: 0 24px; background: transparent; border-bottom: 1px solid var(--border-color);">
-                <button type="button" class="settings-tab-btn active" id="tab-btn-theme" style="display: flex; align-items: center; justify-content: center; gap: 8px;">Display Theme</button>
-                <button type="button" class="settings-tab-btn" id="tab-btn-ai" style="display: flex; align-items: center; justify-content: center; gap: 8px;">AI Models & Keys</button>
+                <button type="button" class="settings-tab-btn active" id="tab-btn-ai" style="display: flex; align-items: center; justify-content: center; gap: 8px;">AI Models & Keys</button>
+                <button type="button" class="settings-tab-btn" id="tab-btn-theme" style="display: flex; align-items: center; justify-content: center; gap: 8px;">Display Theme</button>
             </div>
             <div class="modal-body settings-modal-body" style="padding: 24px;">
+                <!-- AI Models & Keys Tab View (Default) -->
+                <div id="settings-view-ai" class="settings-tab-view">
+                    <form id="ai-settings-form" class="auth-form" style="padding-top: 0;">
+                        <div class="form-group" style="margin-bottom: 5px;">
+                            <label for="setting-llm-model">Select NVIDIA LLM Model</label>
+                            <select id="setting-llm-model" class="form-input">
+                                <option value="qwen/qwen2.5-7b-instruct">1. qwen/qwen2.5-7b-instruct (Small / 7B Fast)</option>
+                                <option value="qwen/qwen2.5-coder-32b-instruct">2. qwen/qwen2.5-coder-32b-instruct (32B Technical / Code)</option>
+                                <option value="nvidia/nemotron-4-49b-instruct">3. nvidia/nemotron-4-49b-instruct (NVIDIA Nemotron 49B)</option>
+                                <option value="meta/llama-3.3-70b-instruct" selected>4. meta/llama-3.3-70b-instruct (Recommended / 70B Flagship)</option>
+                                <option value="qwen/qwen2.5-72b-instruct">5. qwen/qwen2.5-72b-instruct (Qwen 72B Reasoning)</option>
+                                <option value="nvidia/nemotron-4-340b-instruct">6. nvidia/nemotron-4-340b-instruct (NVIDIA Nemotron Ultra / 340B+)</option>
+                                <option value="custom">-- Enter Custom Model Identifier --</option>
+                            </select>
+                        </div>
+                        <div class="form-group hidden" id="group-custom-model">
+                            <label for="setting-custom-model">Custom NVIDIA Model ID</label>
+                            <input type="text" id="setting-custom-model" class="form-input" placeholder="e.g. nvidia/nemotron-4-340b-instruct">
+                        </div>
+
+                        <div class="form-group" style="margin-bottom: 5px;">
+                            <label for="setting-embed-model">Embedding Vector Model</label>
+                            <select id="setting-embed-model" class="form-input">
+                                <option value="nvidia/nv-embedqa-e5-v5">nvidia/nv-embedqa-e5-v5 (Default)</option>
+                                <option value="nvidia/llama-3.2-nv-embedqa-1b-v2">nvidia/llama-3.2-nv-embedqa-1b-v2</option>
+                            </select>
+                        </div>
+
+                        <div class="form-group" style="margin-bottom: 10px;">
+                            <label for="setting-nvidia-key">NVIDIA API Key</label>
+                            <div style="position: relative; display: flex; align-items: center;">
+                                <input type="password" id="setting-nvidia-key" class="form-input" placeholder="nvapi-..." autocomplete="off" style="width: 100%; padding-right: 42px; background-color: #e0f2fe; border: 1px solid #38bdf8; color: #0369a1; border-radius: 8px; font-weight: 500; font-size: 0.92rem;">
+                                <button type="button" id="btn-toggle-nvidia-key" title="Show/Hide Key" style="position: absolute; right: 10px; background: transparent; border: none; color: #0284c7; cursor: pointer; display: flex; align-items: center; justify-content: center; padding: 4px;">
+                                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
+                                </button>
+                            </div>
+                        </div>
+
+                        <div class="form-group" style="margin-bottom: 10px;">
+                            <label for="setting-qdrant-url">Qdrant Cluster URL</label>
+                            <input type="text" id="setting-qdrant-url" class="form-input" placeholder="https://your-cluster.qdrant.tech" autocomplete="off" style="background-color: #e0f2fe; border: 1px solid #38bdf8; color: #0369a1; border-radius: 8px; font-weight: 500; font-size: 0.92rem;">
+                        </div>
+
+                        <div class="form-group" style="margin-bottom: 18px;">
+                            <label for="setting-qdrant-key">Qdrant API Key</label>
+                            <div style="position: relative; display: flex; align-items: center;">
+                                <input type="password" id="setting-qdrant-key" class="form-input" placeholder="Enter Qdrant Cloud API key..." autocomplete="off" style="width: 100%; padding-right: 42px; background-color: #e0f2fe; border: 1px solid #38bdf8; color: #0369a1; border-radius: 8px; font-weight: 500; font-size: 0.92rem;">
+                                <button type="button" id="btn-toggle-qdrant-key" title="Show/Hide Key" style="position: absolute; right: 10px; background: transparent; border: none; color: #0284c7; cursor: pointer; display: flex; align-items: center; justify-content: center; padding: 4px;">
+                                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
+                                </button>
+                            </div>
+                        </div>
+
+                        <div style="display: flex; gap: 10px;">
+                            <button type="button" id="btn-test-ai-settings" class="btn btn-secondary" style="flex: 1; display: flex; justify-content: center; align-items: center; gap: 8px; font-size: 0.95rem; background: transparent; border: 1px solid var(--border-color);">Test Connections</button>
+                            <button type="submit" class="btn btn-primary" style="flex: 1; display: flex; justify-content: center; align-items: center; gap: 8px; font-size: 0.95rem;">Save Settings</button>
+                        </div>
+                    </form>
+                </div>
+
                 <!-- Theme Tab View -->
-                <div id="settings-view-theme" class="settings-tab-view">
+                <div id="settings-view-theme" class="settings-tab-view hidden">
                     <div class="settings-section">
                         <h4 style="font-size: 0.95rem; font-weight: 600;">Choose Display Theme</h4>
                         <p class="settings-desc" style="margin-bottom: 15px;">Select your preferred visual theme for the DiagTrace portal.</p>
@@ -502,60 +562,6 @@
                         </div>
                     </div>
                 </div>
-
-                <!-- AI Models & Keys Tab View -->
-                <div id="settings-view-ai" class="settings-tab-view hidden">
-                    <form id="ai-settings-form" class="auth-form" style="padding-top: 0;">
-                        <div class="form-group" style="margin-bottom: 5px;">
-                            <label for="setting-llm-model">Select NVIDIA LLM Model</label>
-                            <select id="setting-llm-model" class="form-input">
-                                <option value="meta/llama-3.3-70b-instruct">meta/llama-3.3-70b-instruct (Recommended)</option>
-                                <option value="nvidia/llama-3.1-nemotron-70b-instruct">nvidia/llama-3.1-nemotron-70b-instruct</option>
-                                <option value="mistralai/mixtral-8x22b-instruct-v0.1">mistralai/mixtral-8x22b-instruct-v0.1</option>
-                                <option value="deepseek-ai/deepseek-r1">deepseek-ai/deepseek-r1</option>
-                                <option value="custom">-- Enter Custom Model Identifier --</option>
-                            </select>
-                        </div>
-                        <div class="form-group hidden" id="group-custom-model">
-                            <label for="setting-custom-model">Custom NVIDIA Model ID</label>
-                            <input type="text" id="setting-custom-model" class="form-input" placeholder="e.g. nvidia/nemotron-4-340b-instruct">
-                        </div>
-
-                        <div class="form-group" style="margin-bottom: 5px;">
-                            <label for="setting-embed-model">Embedding Vector Model</label>
-                            <select id="setting-embed-model" class="form-input">
-                                <option value="nvidia/nv-embedqa-e5-v5">nvidia/nv-embedqa-e5-v5 (Default)</option>
-                                <option value="nvidia/llama-3.2-nv-embedqa-1b-v2">nvidia/llama-3.2-nv-embedqa-1b-v2</option>
-                            </select>
-                        </div>
-
-                        <div class="form-group" style="margin-bottom: 5px;">
-                            <label for="setting-nvidia-key">NVIDIA API Key</label>
-                            <div style="position: relative;">
-                                <input type="password" id="setting-nvidia-key" class="form-input" placeholder="nvapi-..." autocomplete="off" style="width: 100%; padding-right: 35px;">
-                                <span style="position: absolute; right: 10px; top: 50%; transform: translateY(-50%); color: var(--text-muted); cursor: pointer; display:flex;"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg></span>
-                            </div>
-                        </div>
-
-                        <div class="form-group" style="margin-bottom: 5px;">
-                            <label for="setting-qdrant-url">Qdrant Cluster URL</label>
-                            <input type="text" id="setting-qdrant-url" class="form-input" placeholder="https://your-cluster.qdrant.tech" autocomplete="off">
-                        </div>
-
-                        <div class="form-group" style="margin-bottom: 15px;">
-                            <label for="setting-qdrant-key">Qdrant API Key</label>
-                            <div style="position: relative;">
-                                <input type="password" id="setting-qdrant-key" class="form-input" placeholder="Qdrant..." autocomplete="off" style="width: 100%; padding-right: 35px;">
-                                <span style="position: absolute; right: 10px; top: 50%; transform: translateY(-50%); color: var(--text-muted); cursor: pointer; display:flex;"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg></span>
-                            </div>
-                        </div>
-
-                        <div style="display: flex; gap: 10px;">
-                            <button type="button" id="btn-test-ai-settings" class="btn btn-secondary" style="flex: 1; display: flex; justify-content: center; align-items: center; gap: 8px; font-size: 0.95rem; background: transparent; border: 1px solid var(--border-color);">Test Connections</button>
-                            <button type="submit" class="btn btn-primary" style="flex: 1; display: flex; justify-content: center; align-items: center; gap: 8px; font-size: 0.95rem;">Save Settings</button>
-                        </div>
-                    </form>
-                </div>
             </div>
         </div>
     </div>
@@ -563,9 +569,19 @@
     <!-- AI RCA REPORT MODAL -->
     <div id="rca-modal" class="modal hidden">
         <div class="modal-content rca-modal-content">
-            <div class="modal-header">
-                <h3>🤖 AI Root Cause Analysis & Diagnostic Report</h3>
-                <span id="rca-close" class="modal-close">&times;</span>
+            <div class="modal-header" style="display: flex; justify-content: space-between; align-items: center; padding: 16px 24px; border-bottom: 1px solid var(--border-color);">
+                <h3 style="font-size: 1.1rem; display: flex; align-items: center; gap: 8px; margin: 0;">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: var(--primary);"><rect x="4" y="4" width="16" height="16" rx="2" ry="2"></rect><rect x="9" y="9" width="6" height="6"></rect><line x1="9" y1="1" x2="9" y2="4"></line><line x1="15" y1="1" x2="15" y2="4"></line><line x1="9" y1="20" x2="9" y2="23"></line><line x1="15" y1="20" x2="15" y2="23"></line><line x1="20" y1="9" x2="23" y2="9"></line><line x1="20" y1="15" x2="23" y2="15"></line><line x1="1" y1="9" x2="4" y2="9"></line><line x1="1" y1="15" x2="4" y2="15"></line></svg> AI Root Cause Analysis & Diagnostic Report
+                </h3>
+                <div style="display: flex; align-items: center; gap: 10px;">
+                    <button type="button" id="btn-dock-rca" class="modal-dock-btn" title="Minimize / Dock to Bottom Right" style="display: flex; align-items: center; gap: 4px;">
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 17v5"></path><path d="M5 17h14v-1.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V6h1a2 2 0 0 0 0-4H8a2 2 0 0 0 0 4h1v4.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24Z"></path></svg> Dock
+                    </button>
+                    <button type="button" id="btn-download-rca" class="btn btn-success btn-small hidden" style="display: flex; align-items: center; gap: 6px; padding: 6px 14px; font-size: 0.85rem; border-radius: 6px; cursor: pointer;" title="Download RCA Report (.md)">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg> Download Report
+                    </button>
+                    <span id="rca-close" class="modal-close">&times;</span>
+                </div>
             </div>
             <div class="modal-body rca-modal-body">
                 <div id="rca-loading" class="rca-loading hidden">
@@ -584,21 +600,31 @@
         <div class="modal-content auth-modal-content settings-modal-content" style="max-width: 650px;">
             <div class="modal-header" style="border-bottom: none; flex-direction: column; align-items: flex-start; gap: 4px; padding: 20px 24px 15px 24px; position: relative;">
                 <div style="position: absolute; right: 20px; top: 20px; display: flex; align-items: center; gap: 10px;">
-                    <button type="button" id="btn-dock-rag" class="modal-dock-btn" title="Minimize / Dock to Bottom Right">📌 Dock</button>
+                    <button type="button" id="btn-dock-rag" class="modal-dock-btn" title="Minimize / Dock to Bottom Right" style="display: flex; align-items: center; gap: 4px;">
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 17v5"></path><path d="M5 17h14v-1.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V6h1a2 2 0 0 0 0-4H8a2 2 0 0 0 0 4h1v4.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24Z"></path></svg> Dock
+                    </button>
                     <span id="rag-close" class="modal-close">&times;</span>
                 </div>
-                <h3 style="font-size: 1.1rem; display: flex; align-items: center; gap: 8px;">📚 RAG Knowledge Base Manager</h3>
+                <h3 style="font-size: 1.1rem; display: flex; align-items: center; gap: 8px;">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: var(--primary);"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path></svg> RAG Knowledge Base Manager
+                </h3>
                 <p style="font-size: 0.85rem; color: var(--text-secondary); margin: 0;">Upload technical manuals & vector index context for AI diagnostics</p>
             </div>
             <div class="settings-tabs-header" style="padding: 0 24px; background: transparent; border-bottom: 1px solid var(--border-color);">
-                <button type="button" class="settings-tab-btn active" id="rag-tab-file" style="display: flex; align-items: center; justify-content: center; gap: 8px;">📁 File Upload (LLM Chunking)</button>
-                <button type="button" class="settings-tab-btn" id="rag-tab-manual" style="display: flex; align-items: center; justify-content: center; gap: 8px;">📝 Manual Text Input</button>
+                <button type="button" class="settings-tab-btn active" id="rag-tab-file" style="display: flex; align-items: center; justify-content: center; gap: 8px;">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="12" y1="18" x2="12" y2="12"></line><polyline points="9 15 12 12 15 15"></polyline></svg> File Upload (LLM Chunking)
+                </button>
+                <button type="button" class="settings-tab-btn" id="rag-tab-manual" style="display: flex; align-items: center; justify-content: center; gap: 8px;">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg> Manual Text Input
+                </button>
             </div>
             <div class="modal-body settings-modal-body" style="padding: 24px; max-height: calc(85vh - 140px); overflow-y: auto;">
                 <!-- Live Progress Feed Section -->
                 <div id="rag-progress-section" class="rag-progress-section hidden">
                     <div class="progress-header-info">
-                        <span id="rag-progress-status-text" class="progress-status-text">⚡ Ingesting document...</span>
+                        <span id="rag-progress-status-text" class="progress-status-text" style="display: flex; align-items: center; gap: 6px;">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg> Ingesting document...
+                        </span>
                         <span id="rag-progress-percentage" class="progress-percentage">0%</span>
                     </div>
                     <div class="progress-bar-track">
@@ -628,17 +654,21 @@
                         <div class="form-group">
                             <label>Upload Document File (.pdf, .docx, .txt, .csv, .json, .md, .log)</label>
                             <div id="rag-dropzone" class="file-dropzone">
-                                <div class="dropzone-icon">📄</div>
+                                <div class="dropzone-icon" style="display: flex; justify-content: center; margin-bottom: 8px;">
+                                    <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="color: var(--primary);"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
+                                </div>
                                 <div class="dropzone-text">Drag & Drop document file here or <b>Browse</b></div>
                                 <div class="dropzone-hint">Supports PDF, DOCX, TXT, CSV, JSON, LOG, MD up to 25MB</div>
                                 <input type="file" id="rag-file-input" accept=".pdf,.docx,.txt,.csv,.json,.log,.md" class="hidden-file-input">
                             </div>
                             <div id="rag-file-preview" class="file-preview-badge hidden">
-                                📄 <span id="rag-file-name">filename.pdf</span>
+                                <span style="display: flex; align-items: center; gap: 6px;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline></svg> <span id="rag-file-name">filename.pdf</span></span>
                                 <button type="button" id="btn-remove-rag-file" class="btn-icon-remove">&times;</button>
                             </div>
                         </div>
-                        <button type="submit" id="btn-upload-rag-file" class="btn btn-primary btn-full" style="display: flex; justify-content: center; align-items: center; gap: 8px; font-size: 0.95rem; margin-top: 5px;">📤 Parse, LLM Chunk & Ingest to Vector DB</button>
+                        <button type="submit" id="btn-upload-rag-file" class="btn btn-primary btn-full" style="display: flex; justify-content: center; align-items: center; gap: 8px; font-size: 0.95rem; margin-top: 5px;">
+                            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg> Parse, LLM Chunk & Ingest to Vector DB
+                        </button>
                     </form>
                 </div>
 
@@ -664,7 +694,9 @@
                             <label for="rag-content">Document Content / Text</label>
                             <textarea id="rag-content" class="form-input" rows="4" placeholder="Paste requirements, signal info, or test findings..."></textarea>
                         </div>
-                        <button type="submit" class="btn btn-primary btn-full" style="display: flex; justify-content: center; align-items: center; gap: 8px; font-size: 0.95rem;">📥 Index into Qdrant Vector DB</button>
+                        <button type="submit" class="btn btn-primary btn-full" style="display: flex; justify-content: center; align-items: center; gap: 8px; font-size: 0.95rem;">
+                            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path><polyline points="17 21 17 13 7 13 7 21"></polyline><polyline points="7 3 7 8 15 8"></polyline></svg> Index into Qdrant Vector DB
+                        </button>
                     </form>
                 </div>
 
@@ -681,8 +713,8 @@
     <!-- FLOATING AI ASSISTANT CHATBOT WIDGET -->
     <div id="ai-chatbot-widget" class="ai-chatbot-widget">
         <!-- Floating Toggle Button -->
-        <button id="chat-widget-toggle" class="chat-widget-toggle" title="Open AI Diagnostic Assistant">
-            <span class="chat-icon">💬</span>
+        <button id="chat-widget-toggle" class="chat-widget-toggle" title="Open AI Diagnostic Assistant" style="display: flex; align-items: center; gap: 8px;">
+            <span class="chat-icon" style="display: flex; align-items: center;"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg></span>
             <span class="chat-label">AI Diagnostics Assistant</span>
         </button>
 
@@ -690,27 +722,27 @@
         <div id="chat-drawer" class="chat-drawer hidden">
             <div class="chat-header">
                 <div class="chat-title">
-                    <span>🤖 DiagTrace AI Assistant</span>
+                    <span style="display: flex; align-items: center; gap: 6px;"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: var(--primary);"><rect x="4" y="4" width="16" height="16" rx="2" ry="2"></rect><rect x="9" y="9" width="6" height="6"></rect><line x1="9" y1="1" x2="9" y2="4"></line><line x1="15" y1="1" x2="15" y2="4"></line><line x1="9" y1="20" x2="9" y2="23"></line><line x1="15" y1="20" x2="15" y2="23"></line><line x1="20" y1="9" x2="23" y2="9"></line><line x1="20" y1="15" x2="23" y2="15"></line><line x1="1" y1="9" x2="4" y2="9"></line><line x1="1" y1="15" x2="4" y2="15"></line></svg> DiagTrace AI Assistant</span>
                     <span class="chat-status-dot"></span>
                 </div>
                 <button id="chat-drawer-close" class="close-dialog-btn">&times;</button>
             </div>
             <div id="chat-history" class="chat-history">
                 <div class="chat-message bot">
-                    <div class="msg-avatar">🤖</div>
+                    <div class="msg-avatar"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="16" rx="2" ry="2"></rect><rect x="9" y="9" width="6" height="6"></rect><line x1="9" y1="1" x2="9" y2="4"></line><line x1="15" y1="1" x2="15" y2="4"></line><line x1="9" y1="20" x2="9" y2="23"></line><line x1="15" y1="20" x2="15" y2="23"></line><line x1="20" y1="9" x2="23" y2="9"></line><line x1="20" y1="15" x2="23" y2="15"></line><line x1="1" y1="9" x2="4" y2="9"></line><line x1="1" y1="15" x2="4" y2="15"></line></svg></div>
                     <div class="msg-bubble">
                         Hello! I am your AI Diagnostics & RAG Assistant. Ask me anything about ECU architectures, CAN signal matrices, DTC root cause analysis, or ask me to <b>generate reports and draw custom charts</b>!
                     </div>
                 </div>
             </div>
             <div class="chat-quick-chips">
-                <button class="chip-btn" data-prompt="Perform AI Root Cause Analysis on current diagnostic data">🤖 Run AI RCA</button>
-                <button class="chip-btn" data-prompt="Draw a chart showing Top Modules DTC breakdown">📊 Draw Module Chart</button>
-                <button class="chip-btn" data-prompt="Show diagnostic issue status distribution chart">🍩 Status Chart</button>
+                <button class="chip-btn" data-prompt="Perform AI Root Cause Analysis on current diagnostic data" style="display: flex; align-items: center; gap: 4px;"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="16" rx="2" ry="2"></rect><rect x="9" y="9" width="6" height="6"></rect></svg> Run AI RCA</button>
+                <button class="chip-btn" data-prompt="Draw a chart showing Top Modules DTC breakdown" style="display: flex; align-items: center; gap: 4px;"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"></line><line x1="12" y1="20" x2="12" y2="4"></line><line x1="6" y1="20" x2="6" y2="14"></line></svg> Draw Module Chart</button>
+                <button class="chip-btn" data-prompt="Show diagnostic issue status distribution chart" style="display: flex; align-items: center; gap: 4px;"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.21 15.89A10 10 0 1 1 8 2.83"></path><path d="M22 12A10 10 0 0 0 12 2v10z"></path></svg> Status Chart</button>
             </div>
             <form id="chat-form" class="chat-input-form">
                 <input type="text" id="chat-input" class="chat-input" placeholder="Ask AI or request a chart/report..." required autocomplete="off">
-                <button type="submit" id="chat-submit-btn" class="chat-submit-btn">Send ➔</button>
+                <button type="submit" id="chat-submit-btn" class="chat-submit-btn" style="display: flex; align-items: center; gap: 6px;">Send <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"></line><polyline points="12 5 19 12 12 19"></polyline></svg></button>
             </form>
         </div>
     </div>
@@ -718,7 +750,7 @@
     <!-- DOCKED FLOATING RAG PROGRESS WIDGET -->
     <div id="docked-rag-widget" class="docked-rag-widget hidden">
         <div class="docked-widget-header">
-            <span class="docked-widget-title">⚡ RAG Background Processing</span>
+            <span class="docked-widget-title" style="display: flex; align-items: center; gap: 6px;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg> RAG Background Processing</span>
             <div class="docked-widget-actions">
                 <button type="button" id="btn-maximize-docked-rag" class="btn-dock-action" title="Maximize Window">🗖</button>
                 <button type="button" id="btn-close-docked-rag" class="btn-dock-action" title="Dismiss">&times;</button>
@@ -728,6 +760,26 @@
             <div id="docked-rag-status-text" class="docked-status-text">Processing document...</div>
             <div class="docked-progress-track">
                 <div id="docked-rag-progress-bar" class="docked-progress-bar" style="width: 0%;"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- DOCKED FLOATING RCA PROGRESS / REPORT WIDGET -->
+    <div id="docked-rca-widget" class="docked-rag-widget hidden" style="bottom: 100px; z-index: 1001;">
+        <div class="docked-widget-header">
+            <span class="docked-widget-title" style="display: flex; align-items: center; gap: 6px;">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: var(--primary);"><rect x="4" y="4" width="16" height="16" rx="2" ry="2"></rect><rect x="9" y="9" width="6" height="6"></rect><line x1="9" y1="1" x2="9" y2="4"></line><line x1="15" y1="1" x2="15" y2="4"></line><line x1="9" y1="20" x2="9" y2="23"></line><line x1="15" y1="20" x2="15" y2="23"></line><line x1="20" y1="9" x2="23" y2="9"></line><line x1="20" y1="15" x2="23" y2="15"></line><line x1="1" y1="9" x2="4" y2="9"></line><line x1="1" y1="15" x2="4" y2="15"></line></svg> 
+                AI RCA Status
+            </span>
+            <div class="docked-widget-actions">
+                <button type="button" id="btn-maximize-docked-rca" class="btn-dock-action" title="Maximize Window">🗖</button>
+                <button type="button" id="btn-close-docked-rca" class="btn-dock-action" title="Dismiss">&times;</button>
+            </div>
+        </div>
+        <div class="docked-widget-body" id="docked-rca-body" style="cursor: pointer;" title="Click to open RCA Report window">
+            <div id="docked-rca-status-text" class="docked-status-text">⚡ Synthesizing RCA report...</div>
+            <div class="docked-progress-track">
+                <div id="docked-rca-progress-bar" class="docked-progress-bar" style="width: 35%;"></div>
             </div>
         </div>
     </div>

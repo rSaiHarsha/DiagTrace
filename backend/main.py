@@ -396,17 +396,15 @@ def ai_chat_endpoint(payload: ChatQueryRequest):
 @app.get("/api/settings/ai")
 def get_ai_settings():
     raw_nvidia_key = os.getenv("NVIDIA_API_KEY", "")
-    masked_nvidia_key = f"{raw_nvidia_key[:6]}...{raw_nvidia_key[-4:]}" if len(raw_nvidia_key) > 10 else (raw_nvidia_key if raw_nvidia_key else "")
     raw_qdrant_key = os.getenv("QDRANT_API_KEY", "")
-    masked_qdrant_key = f"{raw_qdrant_key[:6]}...{raw_qdrant_key[-4:]}" if len(raw_qdrant_key) > 10 else (raw_qdrant_key if raw_qdrant_key else "")
     
     return {
         "nvidia_model": get_nvidia_model(),
         "nvidia_embed_model": get_nvidia_embed_model(),
-        "nvidia_api_key_masked": masked_nvidia_key,
+        "nvidia_api_key": raw_nvidia_key,
         "nvidia_api_key_set": bool(raw_nvidia_key and not raw_nvidia_key.startswith("nvapi-your")),
         "qdrant_url": os.getenv("QDRANT_URL", ""),
-        "qdrant_api_key_masked": masked_qdrant_key,
+        "qdrant_api_key": raw_qdrant_key,
         "qdrant_api_key_set": bool(raw_qdrant_key and not raw_qdrant_key.startswith("your-"))
     }
 
@@ -440,7 +438,7 @@ def test_ai_settings(payload: AISettingsRequest):
                 "model": payload.nvidia_model or "meta/llama-3.3-70b-instruct",
                 "messages": [{"role": "user", "content": "Test"}],
                 "max_tokens": 5
-            }, timeout=10)
+            }, timeout=30)
             if res.status_code == 200:
                 results.append("✅ NVIDIA LLM: Success")
             else:
@@ -458,7 +456,7 @@ def test_ai_settings(payload: AISettingsRequest):
                 "input": ["test"],
                 "model": payload.nvidia_embed_model or "nvidia/nv-embedqa-e5-v5",
                 "input_type": "query"
-            }, timeout=10)
+            }, timeout=30)
             if res.status_code == 200:
                 results.append("✅ NVIDIA Embed: Success")
             else:
@@ -472,7 +470,7 @@ def test_ai_settings(payload: AISettingsRequest):
     try:
         if payload.qdrant_url and payload.qdrant_api_key and not payload.qdrant_api_key.startswith("your-"):
             from qdrant_client import QdrantClient
-            client = QdrantClient(url=payload.qdrant_url, api_key=payload.qdrant_api_key, timeout=5.0)
+            client = QdrantClient(url=payload.qdrant_url, api_key=payload.qdrant_api_key, timeout=20.0)
             client.get_collections()
             results.append("✅ Qdrant DB: Success")
         else:
@@ -482,10 +480,19 @@ def test_ai_settings(payload: AISettingsRequest):
 
     return {"status": "success", "results": results}
 
+# Custom StaticFiles wrapper to prevent AssertionError on WebSocket scopes
+class SPAStaticFiles(StaticFiles):
+    async def __call__(self, scope, receive, send):
+        if scope["type"] != "http":
+            if scope["type"] == "websocket":
+                await send({"type": "websocket.close", "code": 1000})
+            return
+        await super().__call__(scope, receive, send)
+
 # Mount frontend files
 frontend_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "frontend")
 if os.path.exists(frontend_dir):
-    app.mount("/", StaticFiles(directory=frontend_dir, html=True), name="frontend")
+    app.mount("/", SPAStaticFiles(directory=frontend_dir, html=True), name="frontend")
 else:
     # Handle case where frontend folder is missing initially
     @app.get("/")
