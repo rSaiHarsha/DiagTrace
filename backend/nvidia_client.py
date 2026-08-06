@@ -13,7 +13,7 @@ def get_nvidia_api_key() -> str:
     return os.getenv("NVIDIA_API_KEY", "").strip()
 
 def get_nvidia_model() -> str:
-    return os.getenv("NVIDIA_MODEL_NAME", "meta/llama-3.3-70b-instruct").strip()
+    return os.getenv("NVIDIA_MODEL_NAME", "openai/gpt-oss-20b").strip()
 
 def get_nvidia_embed_model() -> str:
     return os.getenv("NVIDIA_EMBED_MODEL", "nvidia/nv-embedqa-e5-v5").strip()

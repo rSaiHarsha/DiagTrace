@@ -21,7 +21,7 @@ def run_log_analysis(row_data: dict, abort_event=None) -> Dict[str, Any]:
     if code:
         queries.append(f"Root cause requirements and system behavior for DTC {code}")
     if module and code:
-        queries.append(f"{module}_{code}")
+        queries.append(f"{module} {code}")
     if description:
         queries.append(f"Diagnostic requirement or root cause for {description}")
     if not queries:
@@ -81,28 +81,60 @@ def run_log_analysis(row_data: dict, abort_event=None) -> Dict[str, Any]:
     
     system_prompt = (
         "You are DiagTrace AI, an expert Automotive Diagnostics Systems Architect and Root Cause Analysis (RCA) Engineer. "
-        "Provide precise, highly technical, professional insights for vehicle diagnostic codes based on the provided context."
+        "You produce precise, highly technical, professional diagnostic reports for vehicle diagnostic trouble codes. "
+        "You ALWAYS follow the EXACT output format given to you. You never deviate from the required section structure."
     )
-    
-    prompt = f"""
-Perform a comprehensive Log Analysis for the following individual diagnostic log entry. 
-Use the provided RAG Knowledge Base context to identify potential root causes, fix instructions, and reference the specific requirements.
 
-### Log Entry Data:
-{json.dumps(row_data, indent=2)}
+    # Build a clean, readable log entry summary for the prompt
+    log_entry_summary_parts = []
+    for key in ["Module", "Code", "Description", "File", "Raw", "Hex", "Issue Status", "Comments", "Author", "Program name", "VIN Number"]:
+        val = row_data.get(key) or row_data.get(key.lower())
+        if val:
+            log_entry_summary_parts.append(f"- **{key}**: {val}")
+    log_entry_summary = "\n".join(log_entry_summary_parts) if log_entry_summary_parts else json.dumps(row_data, indent=2)
 
-### Knowledge Base Context (Existing Issues & Requirements):
+    prompt = f"""You are given a single diagnostic log entry and relevant Knowledge Base context. Produce a professional diagnostic analysis report.
+
+**CRITICAL FORMATTING RULES — YOU MUST FOLLOW THESE EXACTLY:**
+- Use EXACTLY the four section headings shown below, each as `### Heading`.
+- Write in clear, professional prose paragraphs — NOT bullet-only responses.
+- Under "### How to Fix", use a **numbered list** with bold step titles.
+- Under "### Related Context & Sources", use a **bulleted list** with bold source names.
+- Do NOT add any extra sections, preambles, disclaimers, or JSON.
+- Do NOT wrap the output in a code block.
+- Output ONLY the Markdown report starting with `### Diagnostic Overview`.
+
+---
+
+**Log Entry:**
+{log_entry_summary}
+
+**Knowledge Base Context (Retrieved Documents & Requirements):**
 {rag_context_text if rag_context_text.strip() else "No related documents found in Knowledge Base."}
 
-### Instructions:
-Format your response in GitHub-flavored Markdown containing the following sections:
-1. **Diagnostic Overview**: Brief summary of the log entry.
-2. **Root Cause**: Identify the probable root cause(s) based strictly on the log data and the Knowledge Base Context.
-3. **How to Fix**: Detailed instructions on how to resolve the issue based on the context.
-4. **Related Context & Sources**: Explicitly list the related documents, requirements, or existing issues fetched from the context that were used to generate this report.
+---
 
-Output only the Markdown report. Do not include JSON formatting or other extra text.
-"""
+**REQUIRED OUTPUT FORMAT (follow this structure exactly):**
+
+### Diagnostic Overview
+Write a concise 2-4 sentence summary of what this diagnostic log entry indicates. State the diagnostic code, the module/ECU involved, the issue status, and any relevant comments from the log. Explain what this code means in automotive diagnostic terms.
+
+### Root Cause
+Based on the Knowledge Base Context provided above, identify the most probable root cause(s) for this diagnostic code. List each potential root cause as a bullet point with technical detail. If the comments mention recurring behavior or specific conditions, factor those into your analysis. If no Knowledge Base context is available, provide root causes based on standard automotive diagnostic knowledge for this code.
+
+### How to Fix
+Provide a clear, numbered, step-by-step procedure to resolve this issue:
+1. **Step Title**: Detailed instruction for this step.
+2. **Step Title**: Detailed instruction for this step.
+3. **Step Title**: Detailed instruction for this step.
+(Continue as needed. Each step must have a bold title followed by a colon and the instruction.)
+
+### Related Context & Sources
+List the specific documents, requirements, existing issues, or knowledge base entries that were referenced in generating this report:
+- **Source Name**: Brief description of what this source covers and how it relates to the diagnosis.
+- **Source Name**: Brief description.
+(If no Knowledge Base context was available, state that the analysis was based on standard automotive diagnostic knowledge.)"""
+
     try:
         report_markdown = query_nvidia_llm(
             prompt, 

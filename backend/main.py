@@ -480,7 +480,7 @@ def test_ai_settings(payload: AISettingsRequest):
         if payload.nvidia_api_key and not payload.nvidia_api_key.startswith("nvapi-your"):
             headers = {"Authorization": f"Bearer {payload.nvidia_api_key}", "Content-Type": "application/json"}
             res = requests.post(f"{NVIDIA_BASE_URL}/chat/completions", headers=headers, json={
-                "model": payload.nvidia_model or "meta/llama-3.3-70b-instruct",
+                "model": payload.nvidia_model or "openai/gpt-oss-20b",
                 "messages": [{"role": "user", "content": "Test"}],
                 "max_tokens": 5
             }, timeout=300)

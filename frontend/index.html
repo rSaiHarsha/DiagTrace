@@ -451,19 +451,13 @@
                         <div class="form-group" style="margin-bottom: 5px;">
                             <label for="setting-llm-model">Select NVIDIA LLM Model</label>
                             <select id="setting-llm-model" class="form-input">
-    <option value="meta/llama-3.3-70b-instruct" selected>1. meta/llama-3.3-70b-instruct (Recommended / 70B Flagship)</option>
-    <option value="nvidia/llama-3.1-nemotron-70b-instruct">2. nvidia/llama-3.1-nemotron-70b-instruct (NVIDIA Nemotron 70B)</option>
-    <option value="nvidia/llama-3.3-nemotron-super-49b-v1">3. nvidia/llama-3.3-nemotron-super-49b-v1 (NVIDIA Nemotron 49B)</option>
-    <option value="meta/llama-3.1-8b-instruct">4. meta/llama-3.1-8b-instruct (Lightweight / Fast 8B)</option>
-    <option value="deepseek-ai/deepseek-r1">5. deepseek-ai/deepseek-r1 (DeepSeek R1 Reasoning)</option>
-    <option value="mistralai/mistral-7b-instruct-v0.3">6. mistralai/mistral-7b-instruct-v0.3 (Mistral 7B Fast)</option>
-    <option value="custom">-- Enter Custom Model Identifier --</option>
-</select>
-
-                        </div>
-                        <div class="form-group hidden" id="group-custom-model">
-                            <label for="setting-custom-model">Custom NVIDIA Model ID</label>
-                            <input type="text" id="setting-custom-model" class="form-input" placeholder="e.g. nvidia/nemotron-4-340b-instruct">
+                                <option value="openai/gpt-oss-20b" selected>1. openai/gpt-oss-20b (OpenAI GPT-OSS 20B)</option>
+                                <option value="openai/gpt-oss-120b">2. openai/gpt-oss-120b (OpenAI GPT-OSS 120B)</option>
+                                <option value="nvidia/llama-3.1-nemotron-70b-instruct">3. nvidia/llama-3.1-nemotron-70b-instruct (NVIDIA Nemotron 70B)</option>
+                                <option value="nvidia/llama-3.3-nemotron-super-49b-v1">4. nvidia/llama-3.3-nemotron-super-49b-v1 (NVIDIA Nemotron 49B)</option>
+                                <option value="meta/llama-3.1-8b-instruct">5. meta/llama-3.1-8b-instruct (Lightweight / Fast 8B)</option>
+                                <option value="google/gemma-4-31b-it">6. google/gemma-4-31b-it (Google Gemma 4 31B)</option>
+                            </select>
                         </div>
 
                         <div class="form-group" style="margin-bottom: 5px;">
