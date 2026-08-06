@@ -451,14 +451,15 @@
                         <div class="form-group" style="margin-bottom: 5px;">
                             <label for="setting-llm-model">Select NVIDIA LLM Model</label>
                             <select id="setting-llm-model" class="form-input">
-                                <option value="qwen/qwen2.5-7b-instruct">1. qwen/qwen2.5-7b-instruct (Small / 7B Fast)</option>
-                                <option value="qwen/qwen2.5-coder-32b-instruct">2. qwen/qwen2.5-coder-32b-instruct (32B Technical / Code)</option>
-                                <option value="nvidia/nemotron-4-49b-instruct">3. nvidia/nemotron-4-49b-instruct (NVIDIA Nemotron 49B)</option>
-                                <option value="meta/llama-3.3-70b-instruct" selected>4. meta/llama-3.3-70b-instruct (Recommended / 70B Flagship)</option>
-                                <option value="qwen/qwen2.5-72b-instruct">5. qwen/qwen2.5-72b-instruct (Qwen 72B Reasoning)</option>
-                                <option value="nvidia/nemotron-4-340b-instruct">6. nvidia/nemotron-4-340b-instruct (NVIDIA Nemotron Ultra / 340B+)</option>
-                                <option value="custom">-- Enter Custom Model Identifier --</option>
-                            </select>
+    <option value="meta/llama-3.3-70b-instruct" selected>1. meta/llama-3.3-70b-instruct (Recommended / 70B Flagship)</option>
+    <option value="nvidia/llama-3.1-nemotron-70b-instruct">2. nvidia/llama-3.1-nemotron-70b-instruct (NVIDIA Nemotron 70B)</option>
+    <option value="nvidia/llama-3.3-nemotron-super-49b-v1">3. nvidia/llama-3.3-nemotron-super-49b-v1 (NVIDIA Nemotron 49B)</option>
+    <option value="meta/llama-3.1-8b-instruct">4. meta/llama-3.1-8b-instruct (Lightweight / Fast 8B)</option>
+    <option value="deepseek-ai/deepseek-r1">5. deepseek-ai/deepseek-r1 (DeepSeek R1 Reasoning)</option>
+    <option value="mistralai/mistral-7b-instruct-v0.3">6. mistralai/mistral-7b-instruct-v0.3 (Mistral 7B Fast)</option>
+    <option value="custom">-- Enter Custom Model Identifier --</option>
+</select>
+
                         </div>
                         <div class="form-group hidden" id="group-custom-model">
                             <label for="setting-custom-model">Custom NVIDIA Model ID</label>
