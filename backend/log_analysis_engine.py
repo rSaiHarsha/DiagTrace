@@ -21,7 +21,7 @@ def run_log_analysis(row_data: dict, abort_event=None) -> Dict[str, Any]:
     if code:
         queries.append(f"Root cause requirements and system behavior for DTC {code}")
     if module and code:
-        queries.append(f"{module} {code}")
+        queries.append(f"{module}_{code}")
     if description:
         queries.append(f"Diagnostic requirement or root cause for {description}")
     if not queries:
