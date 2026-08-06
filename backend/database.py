@@ -41,9 +41,24 @@ def init_db():
                     Author TEXT,
                     [Program name] TEXT,
                     [VIN Number] TEXT,
-                    [Last Updated] TEXT
+                    [Last Updated] TEXT,
+                    Raw TEXT,
+                    Hex TEXT
                 )
             """)
+            # Migrate existing databases: add Raw, Hex, and AI Analysis columns if missing
+            try:
+                cursor.execute("ALTER TABLE diagnostics ADD COLUMN Raw TEXT")
+            except Exception:
+                pass  # Column already exists
+            try:
+                cursor.execute("ALTER TABLE diagnostics ADD COLUMN Hex TEXT")
+            except Exception:
+                pass  # Column already exists
+            try:
+                cursor.execute("ALTER TABLE diagnostics ADD COLUMN [AI Analysis] TEXT")
+            except Exception:
+                pass  # Column already exists
             cursor.execute("""
                 CREATE TABLE IF NOT EXISTS users (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -188,6 +203,9 @@ def load_from_db() -> Optional[pd.DataFrame]:
                 return None
             
             df = pd.read_sql_query("SELECT * FROM diagnostics", conn)
+            # Replace NaN/None with empty strings to prevent FastAPI JSON serialization errors
+            df = df.fillna("")
+            
             # Set the index column as the DataFrame index
             if "index" in df.columns:
                 df.set_index("index", inplace=True)
@@ -244,6 +262,29 @@ def update_row(index: int, comments: str, issue_status: str, author: str) -> Opt
         except Exception as e:
             print(f"Error updating SQLite row {index}: {e}")
             raise RuntimeError(f"Database update failed: {str(e)}")
+
+def update_ai_analysis(index: int, analysis: str) -> bool:
+    """Saves the AI analysis report for a specific row index."""
+    with db_lock:
+        try:
+            conn = get_connection()
+            cursor = conn.cursor()
+            cursor.execute("SELECT 1 FROM diagnostics WHERE [index] = ?", (index,))
+            if not cursor.fetchone():
+                conn.close()
+                return False
+            
+            cursor.execute("""
+                UPDATE diagnostics
+                SET [AI Analysis] = ?
+                WHERE [index] = ?
+            """, (analysis, index))
+            conn.commit()
+            conn.close()
+            return True
+        except Exception as e:
+            print(f"Error updating AI Analysis for row {index}: {e}")
+            return False
 
 def merge_and_deduplicate(new_df: pd.DataFrame) -> pd.DataFrame:
     """Merges new dataframe rows into the existing database entries, avoiding duplicate key combinations."""

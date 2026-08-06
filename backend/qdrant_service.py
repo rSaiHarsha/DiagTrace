@@ -135,8 +135,8 @@ def cosine_similarity(vec1: List[float], vec2: List[float]) -> float:
         return 0.0
     return dot / (norm1 * norm2)
 
-def query_rag_context(query_text: str, query_vector: List[float], category: Optional[str] = None, top_k: int = 3) -> List[Dict[str, Any]]:
-    """Retrieves top matching knowledge base records for RAG context building."""
+def query_rag_context(query_text: str, query_vector: List[float], category: Optional[str] = None, top_k: int = 3, min_score: float = 0.60) -> List[Dict[str, Any]]:
+    """Retrieves top matching knowledge base records for RAG context building with a confidence score threshold."""
     init_qdrant_storage()
     results = []
     
@@ -173,6 +173,7 @@ def query_rag_context(query_text: str, query_vector: List[float], category: Opti
                         collection_name="diagtrace_knowledge",
                         query=query_vector,
                         query_filter=query_filter,
+                        score_threshold=min_score,
                         limit=top_k
                     )
                     hits = response.points
@@ -181,6 +182,7 @@ def query_rag_context(query_text: str, query_vector: List[float], category: Opti
                         collection_name="diagtrace_knowledge",
                         query_vector=query_vector,
                         query_filter=query_filter,
+                        score_threshold=min_score,
                         limit=top_k
                     )
                 else:
@@ -188,13 +190,15 @@ def query_rag_context(query_text: str, query_vector: List[float], category: Opti
                     
                 for hit in hits:
                     payload = getattr(hit, 'payload', {}) or {}
-                    results.append({
-                        "id": payload.get("doc_id"),
-                        "title": payload.get("title"),
-                        "category": payload.get("category"),
-                        "content": payload.get("content"),
-                        "score": getattr(hit, 'score', 0)
-                    })
+                    score = getattr(hit, 'score', 0)
+                    if score >= min_score:
+                        results.append({
+                            "id": payload.get("doc_id"),
+                            "title": payload.get("title"),
+                            "category": payload.get("category"),
+                            "content": payload.get("content"),
+                            "score": score
+                        })
                 if results:
                     return results
         except Exception:
@@ -220,13 +224,14 @@ def query_rag_context(query_text: str, query_vector: List[float], category: Opti
                     score = cosine_similarity(query_vector, vec)
                 except Exception:
                     score = 0.0
-                scored_docs.append({
-                    "id": doc_id,
-                    "title": title,
-                    "category": cat,
-                    "content": content,
-                    "score": score
-                })
+                if score >= min_score:
+                    scored_docs.append({
+                        "id": doc_id,
+                        "title": title,
+                        "category": cat,
+                        "content": content,
+                        "score": score
+                    })
             
             scored_docs.sort(key=lambda x: x["score"], reverse=True)
             return scored_docs[:top_k]
@@ -247,4 +252,19 @@ def get_all_knowledge_documents() -> List[Dict[str, Any]]:
             return [{"id": r[0], "title": r[1], "category": r[2], "created_at": r[3], "length": r[4]} for r in rows]
         except Exception as e:
             print(f"Error listing RAG docs: {e}")
+            return []
+
+def get_all_knowledge_items_full() -> List[Dict[str, Any]]:
+    """Lists all ingested documents with content for fallback keyword search."""
+    init_qdrant_storage()
+    with db_lock:
+        try:
+            conn = get_connection()
+            cursor = conn.cursor()
+            cursor.execute("SELECT id, title, category, content FROM rag_knowledge_base")
+            rows = cursor.fetchall()
+            conn.close()
+            return [{"id": r[0], "title": r[1], "category": r[2], "content": r[3]} for r in rows]
+        except Exception as e:
+            print(f"Error fetching full RAG items: {e}")
             return []
