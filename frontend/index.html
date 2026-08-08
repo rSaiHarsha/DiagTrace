@@ -451,18 +451,13 @@
                         <div class="form-group" style="margin-bottom: 5px;">
                             <label for="setting-llm-model">Select NVIDIA LLM Model</label>
                             <select id="setting-llm-model" class="form-input">
-                                <option value="qwen/qwen2.5-7b-instruct">1. qwen/qwen2.5-7b-instruct (Small / 7B Fast)</option>
-                                <option value="qwen/qwen2.5-coder-32b-instruct">2. qwen/qwen2.5-coder-32b-instruct (32B Technical / Code)</option>
-                                <option value="nvidia/nemotron-4-49b-instruct">3. nvidia/nemotron-4-49b-instruct (NVIDIA Nemotron 49B)</option>
-                                <option value="meta/llama-3.3-70b-instruct" selected>4. meta/llama-3.3-70b-instruct (Recommended / 70B Flagship)</option>
-                                <option value="qwen/qwen2.5-72b-instruct">5. qwen/qwen2.5-72b-instruct (Qwen 72B Reasoning)</option>
-                                <option value="nvidia/nemotron-4-340b-instruct">6. nvidia/nemotron-4-340b-instruct (NVIDIA Nemotron Ultra / 340B+)</option>
-                                <option value="custom">-- Enter Custom Model Identifier --</option>
+                                <option value="openai/gpt-oss-20b" selected>1. openai/gpt-oss-20b (OpenAI GPT-OSS 20B)</option>
+                                <option value="openai/gpt-oss-120b">2. openai/gpt-oss-120b (OpenAI GPT-OSS 120B)</option>
+                                <option value="nvidia/llama-3.1-nemotron-70b-instruct">3. nvidia/llama-3.1-nemotron-70b-instruct (NVIDIA Nemotron 70B)</option>
+                                <option value="nvidia/llama-3.3-nemotron-super-49b-v1">4. nvidia/llama-3.3-nemotron-super-49b-v1 (NVIDIA Nemotron 49B)</option>
+                                <option value="meta/llama-3.1-8b-instruct">5. meta/llama-3.1-8b-instruct (Lightweight / Fast 8B)</option>
+                                <option value="google/gemma-4-31b-it">6. google/gemma-4-31b-it (Google Gemma 4 31B)</option>
                             </select>
-                        </div>
-                        <div class="form-group hidden" id="group-custom-model">
-                            <label for="setting-custom-model">Custom NVIDIA Model ID</label>
-                            <input type="text" id="setting-custom-model" class="form-input" placeholder="e.g. nvidia/nemotron-4-340b-instruct">
                         </div>
 
                         <div class="form-group" style="margin-bottom: 5px;">
@@ -568,6 +563,35 @@
                     <p>Synthesizing DTC database trends with Qdrant RAG Knowledge Base...</p>
                 </div>
                 <div id="rca-report-body" class="markdown-body">
+                    <!-- Dynamic Markdown Report inserted here -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- LOG ANALYSIS REPORT MODAL -->
+    <div id="log-analysis-modal" class="modal hidden">
+        <div class="modal-content rca-modal-content">
+            <div class="modal-header" style="display: flex; justify-content: space-between; align-items: center; padding: 16px 24px; border-bottom: 1px solid var(--border-color);">
+                <h3 style="font-size: 1.1rem; display: flex; align-items: center; gap: 8px; margin: 0;">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: var(--primary);"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg> Single Log Context Analysis
+                </h3>
+                <div style="display: flex; align-items: center; gap: 10px;">
+                    <button type="button" id="btn-dock-log-analysis" class="modal-dock-btn" title="Minimize / Dock to Bottom Left" style="display: flex; align-items: center; gap: 4px;">
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 17v5"></path><path d="M5 17h14v-1.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V6h1a2 2 0 0 0 0-4H8a2 2 0 0 0 0 4h1v4.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24Z"></path></svg> Dock
+                    </button>
+                    <button type="button" id="btn-download-log-analysis" class="btn btn-success btn-small hidden" style="display: flex; align-items: center; gap: 6px; padding: 6px 14px; font-size: 0.85rem; border-radius: 6px; cursor: pointer;" title="Download Analysis Report (.md)">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg> Download Report
+                    </button>
+                    <span id="log-analysis-close" class="modal-close">&times;</span>
+                </div>
+            </div>
+            <div class="modal-body rca-modal-body">
+                <div id="log-analysis-loading" class="rca-loading hidden">
+                    <span class="css-spinner"></span>
+                    <p>Analyzing log and searching Vector DB for context...</p>
+                </div>
+                <div id="log-analysis-report-body" class="markdown-body">
                     <!-- Dynamic Markdown Report inserted here -->
                 </div>
             </div>
@@ -746,21 +770,51 @@
     <!-- DOCKED FLOATING RCA PROGRESS / REPORT WIDGET -->
     <div id="docked-rca-widget" class="docked-rag-widget hidden" style="bottom: 100px; z-index: 1001;">
         <div class="docked-widget-header">
-            <span class="docked-widget-title" style="display: flex; align-items: center; gap: 6px;">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: var(--primary);"><rect x="4" y="4" width="16" height="16" rx="2" ry="2"></rect><rect x="9" y="9" width="6" height="6"></rect><line x1="9" y1="1" x2="9" y2="4"></line><line x1="15" y1="1" x2="15" y2="4"></line><line x1="9" y1="20" x2="9" y2="23"></line><line x1="15" y1="20" x2="15" y2="23"></line><line x1="20" y1="9" x2="23" y2="9"></line><line x1="20" y1="15" x2="23" y2="15"></line><line x1="1" y1="9" x2="4" y2="9"></line><line x1="1" y1="15" x2="4" y2="15"></line></svg> 
+            <div style="display: flex; align-items: center; gap: 6px;">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="16" rx="2" ry="2"></rect><rect x="9" y="9" width="6" height="6"></rect></svg> 
                 AI RCA Status
-            </span>
-            <div class="docked-widget-actions">
+            </div>
+            <div style="display: flex; gap: 4px;">
                 <button type="button" id="btn-maximize-docked-rca" class="btn-dock-action" title="Maximize Window">🗖</button>
                 <button type="button" id="btn-close-docked-rca" class="btn-dock-action" title="Dismiss">&times;</button>
             </div>
         </div>
         <div class="docked-widget-body" id="docked-rca-body" style="cursor: pointer;" title="Click to open RCA Report window">
             <div id="docked-rca-status-text" class="docked-status-text">⚡ Synthesizing RCA report...</div>
-            <div class="docked-progress-track">
+            <div class="docked-progress-container" id="docked-rca-progress-container">
                 <div id="docked-rca-progress-bar" class="docked-progress-bar" style="width: 35%;"></div>
             </div>
         </div>
+    </div>
+
+    <!-- DOCKED FLOATING LOG ANALYSIS WIDGET -->
+    <div id="docked-log-analysis-widget" class="docked-rag-widget hidden" style="bottom: 100px; left: 30px; right: auto; z-index: 1001;">
+        <div class="docked-widget-header">
+            <div style="display: flex; align-items: center; gap: 6px;">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg> 
+                Log Analysis
+            </div>
+            <div style="display: flex; gap: 4px;">
+                <button type="button" id="btn-maximize-docked-log-analysis" class="btn-dock-action" title="Maximize Window">🗖</button>
+                <button type="button" id="btn-close-docked-log-analysis" class="btn-dock-action" title="Dismiss">&times;</button>
+            </div>
+        </div>
+        <div class="docked-widget-body" id="docked-log-analysis-body" style="cursor: pointer;" title="Click to open Log Analysis Report window">
+            <div id="docked-log-analysis-status-text" class="docked-status-text">⚡ Analyzing log context...</div>
+            <div class="docked-progress-container" id="docked-log-analysis-progress-container">
+                <div id="docked-log-analysis-progress-bar" class="docked-progress-bar" style="width: 35%;"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- CUSTOM CONTEXT MENU FOR ROWS -->
+    <div id="row-context-menu" class="context-menu hidden">
+        <ul class="context-menu-list">
+            <li id="menu-analyze-log" class="context-menu-item">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+                Analyze Log Context
+            </li>
+        </ul>
     </div>
 
     <!-- Custom Frontend App Javascript -->

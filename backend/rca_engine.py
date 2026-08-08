@@ -372,9 +372,7 @@ def _parse_agent_json(raw_response: str) -> Optional[Dict[str, Any]]:
         return None
 
 
-def _run_agentic_analysis(
-    features: Dict[str, Any], initial_docs: List[Dict[str, Any]], mode: str
-) -> Dict[str, Any]:
+def _run_agentic_analysis(features: Dict[str, Any], initial_docs: List[Dict[str, Any]], mode: str = "rca", abort_event=None) -> Dict[str, Any]:
     docs = list(initial_docs)
     seen_titles = {doc["title"] for doc in docs}
     search_log: List[str] = [f"initial targeted retrieval ({len(docs)} docs)"]
@@ -413,6 +411,7 @@ Respond with your next action as specified in the system instructions.
                 system_prompt=system_prompt,
                 temperature=0.1,
                 max_tokens=1800,
+                abort_event=abort_event
             )
         except Exception as e:
             return {
@@ -470,7 +469,7 @@ respond with ONLY the {{"action": "final", "report_markdown": "..."}} JSON objec
 """
     try:
         raw_response = query_nvidia_llm(
-            final_prompt, system_prompt=system_prompt, temperature=0.1, max_tokens=1800
+            final_prompt, system_prompt=system_prompt, temperature=0.1, max_tokens=1800, abort_event=abort_event
         )
         parsed = _parse_agent_json(raw_response)
         report = parsed.get("report_markdown", raw_response) if parsed else raw_response
@@ -488,7 +487,7 @@ respond with ONLY the {{"action": "final", "report_markdown": "..."}} JSON objec
 # 4. Public entry points
 # ---------------------------------------------------------------------------
 
-def _run(mode: str) -> Dict[str, Any]:
+def _run(mode: str, abort_event=None) -> Dict[str, Any]:
     df = load_from_db()
     if df is None or df.empty:
         return {
@@ -498,7 +497,7 @@ def _run(mode: str) -> Dict[str, Any]:
 
     features = _build_diagnostic_features(df)
     initial_docs = _targeted_rag_retrieval(features)
-    result = _run_agentic_analysis(features, initial_docs, mode=mode)
+    result = _run_agentic_analysis(features, initial_docs, mode=mode, abort_event=abort_event)
 
     return {
         "status": "success",
@@ -513,13 +512,13 @@ def _run(mode: str) -> Dict[str, Any]:
     }
 
 
-def run_ai_rca_analysis() -> Dict[str, Any]:
+def run_ai_rca_analysis(abort_event=None) -> Dict[str, Any]:
     """Runs agentic AI Root Cause Analysis over all diagnostic entries."""
-    return _run(mode="rca")
+    return _run(mode="rca", abort_event=abort_event)
 
 
-def get_weekly_ai_summary() -> Dict[str, Any]:
+def get_weekly_ai_summary(abort_event=None) -> Dict[str, Any]:
     """Generates a trend-focused executive weekly summary (distinct report shape from RCA)."""
-    return _run(mode="weekly_summary")
+    return _run(mode="weekly_summary", abort_event=abort_event)
 
 

@@ -17,12 +17,12 @@ def run():
         python_exe = sys.executable
         
     print(f"Active Python interpreter: {python_exe}")
-    print("Starting FastAPI Backend (Uvicorn) on http://127.0.0.1:8000 ...")
+    print("Starting FastAPI Backend (Uvicorn) on http://127.0.0.1:5000 ...")
     
     try:
         backend_proc = subprocess.Popen([
             python_exe, "-m", "uvicorn", "backend.main:app", 
-            "--host", "127.0.0.1", "--port", "8000"
+            "--host", "127.0.0.1", "--port", "5000"
         ])
         
         while True:

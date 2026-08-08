@@ -14,7 +14,7 @@ import uuid
 from backend.parser import DiagnosticParser
 from backend.database import (
     init_db, load_from_db, save_to_db, update_row, merge_and_deduplicate,
-    create_user, authenticate_user, create_session, get_user_by_token, delete_session
+    create_user, authenticate_user, create_session, get_user_by_token, delete_session, update_ai_analysis
 )
 from backend.rag_engine import (
     ingest_knowledge_document, ingest_file_document, 
@@ -22,6 +22,7 @@ from backend.rag_engine import (
 )
 from backend.qdrant_service import get_all_knowledge_documents, set_qdrant_config
 from backend.rca_engine import run_ai_rca_analysis, get_weekly_ai_summary
+from backend.log_analysis_engine import run_log_analysis
 from backend.chatbot_engine import process_chatbot_query
 from backend.nvidia_client import get_nvidia_model, get_nvidia_embed_model, set_nvidia_ai_config
 
@@ -109,14 +110,11 @@ def run_parsing_thread(folder_path: str):
         if not os.path.exists(folder_path):
             with state_lock:
                 state["status_logs"].append({
-                    "message": f"Path '{folder_path}' not found. Creating temporary server folder for ingestion simulation...",
+                    "message": f"Path '{folder_path}' not found. Creating folder...",
                     "level": "warning",
                     "time": datetime.now().strftime("%H:%M:%S")
                 })
             os.makedirs(folder_path, exist_ok=True)
-            for i in range(1, 11):
-                with open(os.path.join(folder_path, f"log_file_{i}.txt"), "w") as f:
-                    f.write("mock content")
 
         parser = DiagnosticParser(folder_path)
         
@@ -369,13 +367,60 @@ def rag_documents_endpoint():
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to list RAG documents: {str(e)}")
 
+import asyncio
+from fastapi import Request
+
 @app.post("/api/ai/rca")
-def ai_rca_endpoint():
+async def ai_rca_endpoint(request: Request):
+    abort_event = threading.Event()
+    
+    # Run in a separate thread so we can poll for client disconnection
+    task = asyncio.create_task(asyncio.to_thread(run_ai_rca_analysis, abort_event))
+    
+    while not task.done():
+        if await request.is_disconnected():
+            abort_event.set()
+            task.cancel()
+            print("RCA Analysis cancelled by client disconnect")
+            raise HTTPException(status_code=499, detail="Client Closed Request")
+        await asyncio.sleep(0.5)
+        
     try:
-        analysis = run_ai_rca_analysis()
-        return analysis
+        return task.result()
     except Exception as e:
+        if "Cancelled" in str(e):
+            raise HTTPException(status_code=499, detail="Cancelled")
         raise HTTPException(status_code=500, detail=f"AI RCA Analysis failed: {str(e)}")
+
+@app.post("/api/analyze-log")
+async def api_analyze_log(row_data: dict, request: Request):
+    abort_event = threading.Event()
+    
+    task = asyncio.create_task(asyncio.to_thread(run_log_analysis, row_data, abort_event))
+    
+    while not task.done():
+        if await request.is_disconnected():
+            abort_event.set()
+            task.cancel()
+            print("Log analysis cancelled by client disconnect")
+            raise HTTPException(status_code=499, detail="Client Closed Request")
+        await asyncio.sleep(0.5)
+        
+    try:
+        result = task.result()
+        if result and result.get("status") == "success":
+            row_index_str = row_data.get("index")
+            if row_index_str is not None:
+                try:
+                    row_index = int(row_index_str)
+                    update_ai_analysis(row_index, result.get("report_markdown", ""))
+                except ValueError:
+                    pass
+        return result
+    except Exception as e:
+        if "Cancelled" in str(e):
+            raise HTTPException(status_code=499, detail="Cancelled")
+        raise HTTPException(status_code=500, detail=f"Log Analysis failed: {str(e)}")
 
 @app.get("/api/ai/weekly-summary")
 def ai_weekly_summary_endpoint():
@@ -435,7 +480,7 @@ def test_ai_settings(payload: AISettingsRequest):
         if payload.nvidia_api_key and not payload.nvidia_api_key.startswith("nvapi-your"):
             headers = {"Authorization": f"Bearer {payload.nvidia_api_key}", "Content-Type": "application/json"}
             res = requests.post(f"{NVIDIA_BASE_URL}/chat/completions", headers=headers, json={
-                "model": payload.nvidia_model or "meta/llama-3.3-70b-instruct",
+                "model": payload.nvidia_model or "openai/gpt-oss-20b",
                 "messages": [{"role": "user", "content": "Test"}],
                 "max_tokens": 5
             }, timeout=300)
