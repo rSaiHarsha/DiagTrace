@@ -114,7 +114,7 @@ const elements = {
     btnTestAiSettings: document.getElementById('btn-test-ai-settings'),
     
     // AI RCA & RAG & Chatbot
-    btnRunRca: document.getElementById('btn-run-rca'),
+    btnRunRca: document.getElementById('btn-sidebar-rca-nav'),
     btnDownloadRca: document.getElementById('btn-download-rca'),
     btnDockRca: document.getElementById('btn-dock-rca'),
     dockedRcaWidget: document.getElementById('docked-rca-widget'),
@@ -123,7 +123,7 @@ const elements = {
     btnMaximizeDockedRca: document.getElementById('btn-maximize-docked-rca'),
     btnCloseDockedRca: document.getElementById('btn-close-docked-rca'),
     dockedRcaBody: document.getElementById('docked-rca-body'),
-    btnOpenRag: document.getElementById('btn-open-rag'),
+    btnOpenRag: document.getElementById('btn-sidebar-rag-nav'),
     rcaModal: document.getElementById('rca-modal'),
     rcaClose: document.getElementById('rca-close'),
     rcaLoading: document.getElementById('rca-loading'),

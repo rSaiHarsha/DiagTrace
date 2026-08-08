@@ -2363,3 +2363,106 @@ custom-dropdown, .custom-dropdown {
 
 
 
+
+/* --- NEW UI DASHBOARD LAYOUT V2 --- */
+
+.app-body-wrapper {
+    display: flex;
+    height: calc(100vh - 61px); /* minus header height */
+    overflow: hidden;
+}
+
+/* Left Sidebar Navigation */
+.left-sidebar {
+    width: 80px;
+    background: var(--bg-card);
+    border-right: 1px solid var(--border-color);
+    display: flex;
+    flex-direction: column;
+    padding-top: 15px;
+    z-index: 40;
+    transition: width 0.3s ease;
+}
+
+
+
+.sidebar-nav {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: 0 12px;
+}
+
+.sidebar-link {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    padding: 10px 5px;
+    text-decoration: none;
+    color: var(--text-secondary);
+    border-radius: 8px;
+    transition: all 0.2s ease;
+    overflow: hidden;
+    gap: 4px;
+}
+
+.sidebar-link:hover, .sidebar-link.active {
+    background-color: rgba(59, 130, 246, 0.1);
+    color: var(--primary);
+}
+
+.sidebar-icon {
+    min-width: 24px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+.sidebar-text {
+    font-weight: 500;
+    font-size: 0.65rem;
+    opacity: 1;
+    text-align: center;
+    white-space: normal;
+    line-height: 1.1;
+}
+
+
+
+/* Dashboard Layout */
+.dashboard-layout {
+    display: flex;
+    flex-direction: row;
+    height: 100%;
+    gap: 20px;
+    padding: 15px;
+    overflow: hidden;
+}
+
+.table-area {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    min-width: 0; /* allows flex item to shrink below content size */
+}
+
+/* Override existing KPI/Charts rules to fit right sidebar */
+
+
+
+
+
+
+
+
+
+
+
+
+/* Fix scrolling for app-container when inside app-body-wrapper */
+.app-container {
+    overflow-y: auto;
+    flex: 1;
+}
