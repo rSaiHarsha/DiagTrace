@@ -25,7 +25,6 @@
 <button class="btn btn-secondary btn-small" id="btn-header-profile" style="display: flex; align-items: center; gap: 6px;" title="User Profile">
 <svg fill="none" height="14" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewbox="0 0 24 24" width="14"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg> <span id="header-profile-text">Profile</span>
 </button>
-
 </div>
 </div>
 </header><div class="app-body-wrapper"><aside class="left-sidebar">
@@ -71,14 +70,14 @@
 <!--  RESULTS SECTION (TABLE FIRST, THEN CHARTS) -->
 <section class="results-section" id="results-section"><div class="card grid-card">
 <div class="card-header">
-<div class="upload-status-group">
+<div class="upload-status-group" style="display: flex; gap: 10px; align-items: center;">
 <button class="btn btn-small" id="btn-browse-folder" style="display: flex; align-items: center; gap: 6px;">
 <svg fill="none" height="14" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2.2" viewbox="0 0 24 24" width="14"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" x2="12" y1="3" y2="15"></line></svg> Upload Logs
                         </button>
 <span class="spinner hidden" id="console-spinner">
 <span class="css-spinner"></span> Processing
                         </span>
-<span><button class="btn-icon" id="btn-toggle-logs" title="Minimize/Maximize logs">-Status</button></span>
+<span><button class="btn btn-secondary btn-small" id="btn-toggle-logs" style="display: flex; align-items: center; gap: 6px;" title="Minimize/Maximize logs"><svg class="status-btn-icon" fill="none" height="14" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewbox="0 0 24 24" width="14"><line x1="5" x2="19" y1="12" y2="12"></line></svg> Status</button></span>
 </div>
 <div class="header-actions">
 <button class="btn btn-secondary btn-small" id="btn-clear-filters" style="display: flex; align-items: center; gap: 6px;" title="Clear all active column filters">
