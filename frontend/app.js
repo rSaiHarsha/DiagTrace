@@ -12,7 +12,8 @@ let appState = {
     activeTab: "server",
     currentUser: null,
     authToken: localStorage.getItem('diagtrace_token') || null,
-    currentTheme: localStorage.getItem('diagtrace_theme') || 'white'
+    currentTheme: localStorage.getItem('diagtrace_theme') || 'white',
+    lastRcaMarkdown: ""
 };
 
 // Global Chart.js Instances
@@ -72,6 +73,8 @@ const elements = {
     signinPassword: document.getElementById('signin-password'),
     signinError: document.getElementById('signin-error'),
     linkGotoSignup: document.getElementById('link-goto-signup'),
+
+    
     
     signupModal: document.getElementById('signup-modal'),
     signupClose: document.getElementById('signup-close'),
@@ -102,15 +105,24 @@ const elements = {
     settingsViewAi: document.getElementById('settings-view-ai'),
     aiSettingsForm: document.getElementById('ai-settings-form'),
     settingLlmModel: document.getElementById('setting-llm-model'),
-    groupCustomModel: document.getElementById('group-custom-model'),
-    settingCustomModel: document.getElementById('setting-custom-model'),
     settingEmbedModel: document.getElementById('setting-embed-model'),
     settingNvidiaKey: document.getElementById('setting-nvidia-key'),
+    btnToggleNvidiaKey: document.getElementById('btn-toggle-nvidia-key'),
     settingQdrantUrl: document.getElementById('setting-qdrant-url'),
     settingQdrantKey: document.getElementById('setting-qdrant-key'),
+    btnToggleQdrantKey: document.getElementById('btn-toggle-qdrant-key'),
+    btnTestAiSettings: document.getElementById('btn-test-ai-settings'),
     
     // AI RCA & RAG & Chatbot
     btnRunRca: document.getElementById('btn-run-rca'),
+    btnDownloadRca: document.getElementById('btn-download-rca'),
+    btnDockRca: document.getElementById('btn-dock-rca'),
+    dockedRcaWidget: document.getElementById('docked-rca-widget'),
+    dockedRcaStatusText: document.getElementById('docked-rca-status-text'),
+    dockedRcaProgressBar: document.getElementById('docked-rca-progress-bar'),
+    btnMaximizeDockedRca: document.getElementById('btn-maximize-docked-rca'),
+    btnCloseDockedRca: document.getElementById('btn-close-docked-rca'),
+    dockedRcaBody: document.getElementById('docked-rca-body'),
     btnOpenRag: document.getElementById('btn-open-rag'),
     rcaModal: document.getElementById('rca-modal'),
     rcaClose: document.getElementById('rca-close'),
@@ -234,19 +246,30 @@ function setupEventListeners() {
     // Settings Tabs & AI Models
     if (elements.tabBtnTheme) elements.tabBtnTheme.addEventListener('click', () => switchSettingsTab('theme'));
     if (elements.tabBtnAi) elements.tabBtnAi.addEventListener('click', () => switchSettingsTab('ai'));
-    if (elements.settingLlmModel) {
-        elements.settingLlmModel.addEventListener('change', () => {
-            if (elements.settingLlmModel.value === 'custom') {
-                if (elements.groupCustomModel) elements.groupCustomModel.classList.remove('hidden');
-            } else {
-                if (elements.groupCustomModel) elements.groupCustomModel.classList.add('hidden');
+    if (elements.aiSettingsForm) elements.aiSettingsForm.addEventListener('submit', handleAiSettingsSubmit);
+    if (elements.btnTestAiSettings) elements.btnTestAiSettings.addEventListener('click', handleAiSettingsTest);
+    if (elements.btnToggleNvidiaKey) {
+        elements.btnToggleNvidiaKey.addEventListener('click', () => {
+            if (elements.settingNvidiaKey) {
+                elements.settingNvidiaKey.type = elements.settingNvidiaKey.type === 'password' ? 'text' : 'password';
             }
         });
     }
-    if (elements.aiSettingsForm) elements.aiSettingsForm.addEventListener('submit', handleAiSettingsSubmit);
+    if (elements.btnToggleQdrantKey) {
+        elements.btnToggleQdrantKey.addEventListener('click', () => {
+            if (elements.settingQdrantKey) {
+                elements.settingQdrantKey.type = elements.settingQdrantKey.type === 'password' ? 'text' : 'password';
+            }
+        });
+    }
     
     // AI RCA & RAG Knowledge Base Controls
     if (elements.btnRunRca) elements.btnRunRca.addEventListener('click', runAiRcaAnalysis);
+    if (elements.btnDownloadRca) elements.btnDownloadRca.addEventListener('click', downloadRcaReport);
+    if (elements.btnDockRca) elements.btnDockRca.addEventListener('click', dockRcaModal);
+    if (elements.btnMaximizeDockedRca) elements.btnMaximizeDockedRca.addEventListener('click', maximizeRcaDock);
+    if (elements.btnCloseDockedRca) elements.btnCloseDockedRca.addEventListener('click', closeRcaDock);
+    if (elements.dockedRcaBody) elements.dockedRcaBody.addEventListener('click', maximizeRcaDock);
     if (elements.btnOpenRag) elements.btnOpenRag.addEventListener('click', openRagModal);
     if (elements.rcaClose) elements.rcaClose.addEventListener('click', closeRcaModal);
     if (elements.ragClose) elements.ragClose.addEventListener('click', closeRagModal);
@@ -334,6 +357,14 @@ function setupEventListeners() {
             applyTheme(e.target.value);
             showToast(`Theme changed to ${e.target.value.replace('-', ' ')}`);
         });
+    });
+
+    // Hide custom context menu on outside click
+    document.addEventListener('click', (e) => {
+        const contextMenu = document.getElementById('row-context-menu');
+        if (contextMenu && !contextMenu.classList.contains('hidden')) {
+            contextMenu.classList.add('hidden');
+        }
     });
 
     // Auth Modals Controls
@@ -615,7 +646,7 @@ function closeProfileModal() {
 
 function openSettingsModal() {
     applyTheme(appState.currentTheme);
-    fetchAiSettings();
+    switchSettingsTab('ai');
     if (elements.settingsModal) elements.settingsModal.classList.remove('hidden');
 }
 
@@ -647,25 +678,19 @@ function fetchAiSettings() {
         const modelOptions = Array.from(elements.settingLlmModel.options).map(o => o.value);
         if (modelOptions.includes(data.nvidia_model)) {
             elements.settingLlmModel.value = data.nvidia_model;
-            if (elements.groupCustomModel) elements.groupCustomModel.classList.add('hidden');
-        } else {
-            elements.settingLlmModel.value = 'custom';
-            if (elements.groupCustomModel) elements.groupCustomModel.classList.remove('hidden');
-            if (elements.settingCustomModel) elements.settingCustomModel.value = data.nvidia_model;
         }
 
         if (elements.settingEmbedModel) elements.settingEmbedModel.value = data.nvidia_embed_model || 'nvidia/nv-embedqa-e5-v5';
+        if (elements.settingNvidiaKey) elements.settingNvidiaKey.value = data.nvidia_api_key || '';
         if (elements.settingQdrantUrl) elements.settingQdrantUrl.value = data.qdrant_url || '';
+        if (elements.settingQdrantKey) elements.settingQdrantKey.value = data.qdrant_api_key || '';
     })
     .catch(() => {});
 }
 
 function handleAiSettingsSubmit(e) {
     e.preventDefault();
-    let modelName = elements.settingLlmModel.value;
-    if (modelName === 'custom') {
-        modelName = elements.settingCustomModel.value.trim();
-    }
+    const modelName = elements.settingLlmModel.value;
     const embedModel = elements.settingEmbedModel.value;
     const nvidiaKey = elements.settingNvidiaKey.value.trim();
     const qdrantUrl = elements.settingQdrantUrl.value.trim();
@@ -685,14 +710,53 @@ function handleAiSettingsSubmit(e) {
     .then(res => res.json())
     .then(data => {
         showToast("Information is stored successfully!");
-        if (elements.settingNvidiaKey) elements.settingNvidiaKey.value = '';
-        if (elements.settingQdrantKey) elements.settingQdrantKey.value = '';
-        if (elements.settingQdrantUrl) elements.settingQdrantUrl.value = '';
-        if (elements.settingCustomModel) elements.settingCustomModel.value = '';
         fetchAiSettings();
     })
     .catch(err => {
         showToast(`Failed to update AI settings: ${err.message}`, 'warning');
+    });
+}
+
+function handleAiSettingsTest() {
+    if (!elements.btnTestAiSettings) return;
+    const originalText = elements.btnTestAiSettings.innerText;
+    elements.btnTestAiSettings.innerText = "⚡ Testing (up to 30s)...";
+    elements.btnTestAiSettings.disabled = true;
+
+    const modelName = elements.settingLlmModel.value;
+    const embedModel = elements.settingEmbedModel.value;
+    const nvidiaKey = elements.settingNvidiaKey.value.trim();
+    const qdrantUrl = elements.settingQdrantUrl.value.trim();
+    const qdrantKey = elements.settingQdrantKey.value.trim();
+
+    fetch('/api/settings/ai/test', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            nvidia_api_key: nvidiaKey ? nvidiaKey : undefined,
+            nvidia_model: modelName,
+            nvidia_embed_model: embedModel,
+            qdrant_url: qdrantUrl ? qdrantUrl : undefined,
+            qdrant_api_key: qdrantKey ? qdrantKey : undefined
+        })
+    })
+    .then(async res => {
+        const data = await res.json();
+        elements.btnTestAiSettings.innerText = originalText;
+        elements.btnTestAiSettings.disabled = false;
+        
+        if (!res.ok) {
+            throw new Error(data.detail || 'Test request failed');
+        }
+        
+        if (data.results && data.results.length > 0) {
+            alert("Test Results:\n\n" + data.results.join("\n\n"));
+        }
+    })
+    .catch(err => {
+        elements.btnTestAiSettings.innerText = originalText;
+        elements.btnTestAiSettings.disabled = false;
+        showToast(`Failed to test AI settings: ${err.message}`, 'warning');
     });
 }
 
@@ -1230,7 +1294,7 @@ function buildDynamicColumns() {
     if (appState.allData.length === 0) return;
     
     // Core columns listed in visual priority order
-    const coreColumns = ["File", "Module", "Code", "Description", "Issue Status", "Comments", "Author", "Program name", "VIN Number"];
+    const coreColumns = ["File", "Module", "Code", "Description", "Raw", "Hex", "Issue Status", "Comments", "Author", "Program name", "VIN Number"];
     
     // Get all column keys from dataset
     const allKeys = Object.keys(appState.allData[0] || {});
@@ -1244,24 +1308,30 @@ function buildDynamicColumns() {
         }
     });
     
-    // 2. Add any other "unknown/new" columns at the end, except index and Last Updated
+    // 2. Add any other "unknown/new" columns at the end,
+    //    except index, Last Updated, and AI Analysis (pinned last)
     allKeys.forEach(key => {
-        if (key !== "index" && key !== "Last Updated" && !columns.includes(key)) {
+        if (key !== "index" && key !== "Last Updated" && key !== "AI Analysis" && !columns.includes(key)) {
             columns.push(key);
         }
     });
+
+    // 3. AI Analysis is always the last data column (before Last Updated)
+    if (allKeys.includes("AI Analysis")) {
+        columns.push("AI Analysis");
+    }
     
-    // 3. Make sure Last Updated is placed as the final column if it exists
+    // 4. Make sure Last Updated is placed as the final column if it exists
     if (allKeys.includes("Last Updated")) {
         columns.push("Last Updated");
     }
     
     appState.columns = columns;
     
-    // Re-initialize filters schema for all columns
+    // Re-initialize filters schema: arrays for checkbox multi-select, strings for text inputs
     appState.filters = {};
     columns.forEach(col => {
-        appState.filters[col] = "";
+        appState.filters[col] = []; // empty array = no filter active
     });
 }
 
@@ -1290,32 +1360,40 @@ function buildHeaderFiltersMarkup() {
         // Determine filter type dynamically
         let filterControl = "";
         
-        if (col === "Last Updated") {
+        // No filter for these columns — just a spacer
+        if (col === "Last Updated" || col === "AI Analysis") {
             filterControl = `<div class="header-filter-dummy"></div>`;
         } else {
             const uniqueCount = getUniqueValuesCount(col);
             
-            // Hardcode comments and description to text input, or columns with high cardinality
+            // Text search for Description, Comments, and high-cardinality columns
             const isTextField = (col === "Description" || col === "Comments" || uniqueCount > 50);
             
             if (isTextField) {
                 filterControl = `<input type="text" data-col="${col}" class="header-filter-input" placeholder="Search..." />`;
             } else {
-                // Generate sorted unique values for select options
-                const uniqueVals = [...new Set(appState.allData.map(item => item[col]).filter(Boolean))].sort();
+                // Checkbox multi-select panel
+                const uniqueVals = [...new Set(appState.allData.map(item => item[col]).filter(v => v !== null && v !== undefined && v !== ''))].sort();
+                const safeCol = col.replace(/[^a-zA-Z0-9_-]/g, '_');
                 
-                let optionsHtml = `<div class="dropdown-option" data-value="">All</div>`;
-                uniqueVals.forEach(val => {
-                    optionsHtml += `<div class="dropdown-option" data-value="${val}">${val}</div>`;
-                });
+                let checkboxesHtml = uniqueVals.map(val => {
+                    const safeId = `chk_${safeCol}_${String(val).replace(/[^a-zA-Z0-9]/g, '_')}`;
+                    return `<label class="chk-filter-label" title="${val}">
+                        <input type="checkbox" class="chk-filter-option" data-col="${col}" data-value="${val}" id="${safeId}">
+                        <span class="chk-filter-text">${val}</span>
+                    </label>`;
+                }).join('');
                 
                 filterControl = `
-                    <div class="custom-dropdown" data-col="${col}">
-                        <div class="dropdown-selected" data-value="">All</div>
-                        <div class="dropdown-menu hidden">
-                            <input type="text" class="dropdown-search" placeholder="Search..." />
-                            <div class="dropdown-options-list">
-                                ${optionsHtml}
+                    <div class="chk-dropdown" data-col="${col}">
+                        <button type="button" class="chk-dropdown-trigger" data-col="${col}">All ▾</button>
+                        <div class="chk-dropdown-panel hidden">
+                            <input type="text" class="chk-dropdown-search" placeholder="Search..." />
+                            <div class="chk-options-list">
+                                ${checkboxesHtml}
+                            </div>
+                            <div class="chk-footer">
+                                <button type="button" class="chk-clear-btn" data-col="${col}">Clear</button>
                             </div>
                         </div>
                     </div>
@@ -1330,24 +1408,109 @@ function buildHeaderFiltersMarkup() {
         
         elements.tableHeadersRow.appendChild(th);
     });
+
+    // ── Bind checkbox filter events after DOM injection ──
+    bindCheckboxFilterEvents();
+}
+
+/** Bind all checkbox-filter interactions after DOM is built */
+function bindCheckboxFilterEvents() {
+    // Open/close panel on trigger click
+    elements.tableHeadersRow.addEventListener('click', (e) => {
+        const trigger = e.target.closest('.chk-dropdown-trigger');
+        if (trigger) {
+            e.stopPropagation();
+            const panel = trigger.nextElementSibling;
+            const isOpen = !panel.classList.contains('hidden');
+            // Close all other panels first
+            document.querySelectorAll('.chk-dropdown-panel').forEach(p => p.classList.add('hidden'));
+            if (!isOpen) panel.classList.remove('hidden');
+            return;
+        }
+        // Clear button inside panel
+        const clearBtn = e.target.closest('.chk-clear-btn');
+        if (clearBtn) {
+            const col = clearBtn.dataset.col;
+            const panel = clearBtn.closest('.chk-dropdown-panel');
+            panel.querySelectorAll('.chk-filter-option').forEach(cb => { cb.checked = false; });
+            appState.filters[col] = [];
+            updateCheckboxTriggerLabel(col);
+            appState.currentPage = 1;
+            applyFilters();
+        }
+    });
+
+    // Close panels when clicking outside
+    document.addEventListener('click', (e) => {
+        if (!e.target.closest('.chk-dropdown')) {
+            document.querySelectorAll('.chk-dropdown-panel').forEach(p => p.classList.add('hidden'));
+        }
+    }, true);
+
+    // Checkbox change → update filter
+    elements.tableHeadersRow.addEventListener('change', (e) => {
+        if (e.target.classList.contains('chk-filter-option')) {
+            const col = e.target.dataset.col;
+            collectCheckboxFilter(col);
+            appState.currentPage = 1;
+            applyFilters();
+        }
+    });
+
+    // Search inside checkbox panel
+    elements.tableHeadersRow.addEventListener('input', (e) => {
+        if (e.target.classList.contains('chk-dropdown-search')) {
+            const val = e.target.value.toLowerCase();
+            const list = e.target.closest('.chk-dropdown-panel').querySelector('.chk-options-list');
+            list.querySelectorAll('.chk-filter-label').forEach(label => {
+                label.style.display = label.textContent.toLowerCase().includes(val) ? 'flex' : 'none';
+            });
+        }
+    });
+}
+
+function collectCheckboxFilter(col) {
+    const checked = elements.tableHeadersRow.querySelectorAll(`.chk-filter-option[data-col="${CSS.escape(col)}"]:checked`);
+    appState.filters[col] = Array.from(checked).map(cb => cb.dataset.value);
+    updateCheckboxTriggerLabel(col);
+}
+
+function updateCheckboxTriggerLabel(col) {
+    const dropdown = elements.tableHeadersRow.querySelector(`.chk-dropdown[data-col="${CSS.escape(col)}"]`);
+    if (!dropdown) return;
+    const trigger = dropdown.querySelector('.chk-dropdown-trigger');
+    if (!trigger) return;
+    const selected = appState.filters[col] || [];
+    if (selected.length === 0) {
+        trigger.textContent = 'All ▾';
+        trigger.classList.remove('chk-active');
+    } else {
+        trigger.textContent = `${selected.length} selected ▾`;
+        trigger.classList.add('chk-active');
+    }
 }
 
 function handleFilterChange() {
     // Collect active values from all dynamic header filter controls
     appState.columns.forEach(col => {
-        if (col === "Last Updated") return;
+        if (col === "Last Updated" || col === "AI Analysis") return;
         
-        const control = elements.tableHeadersRow.querySelector(`[data-col="${col}"]`);
-        if (control) {
-            if (control.classList.contains('custom-dropdown')) {
-                const selected = control.querySelector('.dropdown-selected');
-                appState.filters[col] = selected ? (selected.dataset.value || "") : "";
-            } else {
-                appState.filters[col] = control.value;
-            }
+        const uniqueCount = getUniqueValuesCount(col);
+        const isTextField = (col === "Description" || col === "Comments" || uniqueCount > 50);
+        
+        if (isTextField) {
+            const control = elements.tableHeadersRow.querySelector(`input.header-filter-input[data-col]`);
+            // Let inline input handler deal with it — collectCheckboxFilter handles checkbox cols
         }
+        // checkbox cols are handled by their own listener (bindCheckboxFilterEvents)
     });
     
+    // Also pick up any text inputs via the generic path
+    elements.tableHeadersRow.querySelectorAll('.header-filter-input').forEach(input => {
+        const col = input.dataset.col;
+        if (col) appState.filters[col] = input.value;
+    });
+
     appState.currentPage = 1;
     applyFilters();
 }
@@ -1355,24 +1518,25 @@ function handleFilterChange() {
 function applyFilters() {
     appState.filteredData = appState.allData.filter(row => {
         for (const col of appState.columns) {
-            if (col === "Last Updated") continue;
+            if (col === "Last Updated" || col === "AI Analysis") continue;
             
             const filterVal = appState.filters[col];
-            if (!filterVal) continue;
-            
             const cellVal = (row[col] !== undefined && row[col] !== null) ? String(row[col]) : "";
             
             const uniqueCount = getUniqueValuesCount(col);
             const isTextField = (col === "Description" || col === "Comments" || uniqueCount > 50);
             
             if (isTextField) {
-                // Substring search case-insensitive
-                if (!cellVal.toLowerCase().includes(filterVal.toLowerCase().trim())) {
+                // String filter
+                if (!filterVal) continue;
+                if (!cellVal.toLowerCase().includes(String(filterVal).toLowerCase().trim())) {
                     return false;
                 }
             } else {
-                // Strict category selection match
-                if (cellVal !== filterVal) {
+                // Array filter (multi-select checkboxes) — OR logic
+                if (!filterVal || (Array.isArray(filterVal) && filterVal.length === 0)) continue;
+                const selected = Array.isArray(filterVal) ? filterVal : [filterVal];
+                if (!selected.includes(cellVal)) {
                     return false;
                 }
             }
@@ -1387,21 +1551,23 @@ function applyFilters() {
 
 function clearAllFilters() {
     appState.columns.forEach(col => {
-        if (col === "Last Updated") return;
-        
-        const control = elements.tableHeadersRow.querySelector(`[data-col="${col}"]`);
-        if (control) {
-            if (control.classList.contains('custom-dropdown')) {
-                const selected = control.querySelector('.dropdown-selected');
-                if (selected) {
-                    selected.innerText = "All";
-                    selected.dataset.value = "";
-                }
-            } else {
-                control.value = "";
-            }
+        if (col === "Last Updated" || col === "AI Analysis") return;
+        const uniqueCount = getUniqueValuesCount(col);
+        const isTextField = (col === "Description" || col === "Comments" || uniqueCount > 50);
+        if (isTextField) {
+            const input = elements.tableHeadersRow.querySelector(`.header-filter-input[data-col]`);
+            elements.tableHeadersRow.querySelectorAll('.header-filter-input').forEach(inp => {
+                if (inp.dataset.col === col) inp.value = '';
+            });
+            appState.filters[col] = [];
+        } else {
+            // Uncheck all checkboxes for this column
+            elements.tableHeadersRow.querySelectorAll(`.chk-filter-option[data-col]`).forEach(cb => {
+                if (cb.dataset.col === col) cb.checked = false;
+            });
+            appState.filters[col] = [];
+            updateCheckboxTriggerLabel(col);
         }
-        appState.filters[col] = "";
     });
     
     appState.currentPage = 1;
@@ -1528,6 +1694,34 @@ function renderGridAndPagination() {
                     }
                 });
             }
+            // Saved AI Analysis Report
+            else if (col === "AI Analysis") {
+                if (cellValue && cellValue.trim() !== "" && cellValue.toLowerCase() !== "nan") {
+                    td.innerHTML = `<button class="btn-secondary btn-sm" style="display:flex; align-items:center; gap:4px; font-size: 0.75rem; padding: 4px 8px;">
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
+                        View Report
+                    </button>`;
+                    td.querySelector('button').addEventListener('click', (e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        // Open the Log Analysis modal directly with the saved report
+                        if (elementsLogAnalysis.modal) elementsLogAnalysis.modal.classList.remove('hidden');
+                        if (elementsLogAnalysis.loading) elementsLogAnalysis.loading.classList.add('hidden');
+                        if (elementsLogAnalysis.dockWidget) elementsLogAnalysis.dockWidget.classList.add('hidden');
+                        
+                        if (elementsLogAnalysis.reportBody) {
+                            appState.lastLogAnalysisMarkdown = cellValue;
+                            elementsLogAnalysis.reportBody.innerHTML = renderMarkdownSimple(cellValue);
+                        }
+                        if (elementsLogAnalysis.btnDownload) {
+                            elementsLogAnalysis.btnDownload.classList.remove('hidden');
+                        }
+                    });
+                } else {
+                    td.className = "text-muted font-mono";
+                    td.innerText = "-";
+                }
+            }
             // Non-editable columns
             else {
                 if (col === "Last Updated") {
@@ -1545,6 +1739,14 @@ function renderGridAndPagination() {
             }
             
             tr.appendChild(td);
+        });
+        
+        tr.addEventListener('contextmenu', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            if (typeof handleRowContextMenu === 'function') {
+                handleRowContextMenu(e, row);
+            }
         });
         
         elements.registryTableBody.appendChild(tr);
@@ -2064,31 +2266,116 @@ function closeChartDialog() {
 // ----------------------------------------------------
 // AI Root Cause Analysis (RCA) & RAG Knowledge Base
 // ----------------------------------------------------
+function dockRcaModal() {
+    if (elements.rcaModal) elements.rcaModal.classList.add('hidden');
+    if (elements.dockedRcaWidget) elements.dockedRcaWidget.classList.remove('hidden');
+}
+
+function maximizeRcaDock() {
+    if (elements.dockedRcaWidget) elements.dockedRcaWidget.classList.add('hidden');
+    if (elements.rcaModal) elements.rcaModal.classList.remove('hidden');
+}
+
+let rcaAbortController = null;
+
+function stopRcaAnalysis() {
+    if (rcaAbortController) {
+        rcaAbortController.abort();
+        rcaAbortController = null;
+        showToast("RCA process stopped.", "warning");
+    }
+    if (elements.dockedRcaWidget) elements.dockedRcaWidget.classList.add('hidden');
+    if (elements.rcaModal) elements.rcaModal.classList.add('hidden');
+    if (elements.rcaLoading) elements.rcaLoading.classList.add('hidden');
+}
+
+function closeRcaDock() {
+    stopRcaAnalysis();
+}
+
+function updateRcaStatusUI(status, message) {
+    if (elements.dockedRcaStatusText) elements.dockedRcaStatusText.innerText = message;
+    if (elements.dockedRcaProgressBar) {
+        if (status === 'running') {
+            elements.dockedRcaProgressBar.style.width = '45%';
+            elements.dockedRcaProgressBar.style.backgroundColor = 'var(--primary)';
+        } else if (status === 'completed') {
+            elements.dockedRcaProgressBar.style.width = '100%';
+            elements.dockedRcaProgressBar.style.backgroundColor = '#10b981';
+        } else if (status === 'error') {
+            elements.dockedRcaProgressBar.style.width = '100%';
+            elements.dockedRcaProgressBar.style.backgroundColor = '#ef4444';
+        }
+    }
+}
+
 function runAiRcaAnalysis() {
+    if (rcaAbortController) {
+        rcaAbortController.abort();
+    }
+    rcaAbortController = new AbortController();
+
     if (elements.rcaModal) elements.rcaModal.classList.remove('hidden');
     if (elements.rcaLoading) elements.rcaLoading.classList.remove('hidden');
     if (elements.rcaReportBody) elements.rcaReportBody.innerHTML = '';
+    if (elements.btnDownloadRca) elements.btnDownloadRca.classList.add('hidden');
 
-    fetch('/api/ai/rca', { method: 'POST' })
+    updateRcaStatusUI('running', '⚡ Synthesizing RCA report (DTC Trends + RAG)...');
+
+    fetch('/api/ai/rca', { method: 'POST', signal: rcaAbortController.signal })
     .then(res => res.json())
     .then(data => {
+        rcaAbortController = null;
         if (elements.rcaLoading) elements.rcaLoading.classList.add('hidden');
         if (data.status === 'success' && elements.rcaReportBody) {
+            appState.lastRcaMarkdown = data.report_markdown || '';
             elements.rcaReportBody.innerHTML = renderMarkdownSimple(data.report_markdown);
+            if (elements.btnDownloadRca && data.report_markdown) {
+                elements.btnDownloadRca.classList.remove('hidden');
+            }
+            updateRcaStatusUI('completed', '🎉 RCA Report Generated! (Click to View)');
+            showToast('🎉 AI Root Cause Analysis Report Generated!');
         } else if (elements.rcaReportBody) {
-            elements.rcaReportBody.innerHTML = `<p class="auth-error-msg">${data.message || 'Failed to run RCA analysis.'}</p>`;
+            const errMsg = data.message || 'Failed to run RCA analysis.';
+            elements.rcaReportBody.innerHTML = `<p class="auth-error-msg">${errMsg}</p>`;
+            updateRcaStatusUI('error', `❌ RCA Failed: ${errMsg}`);
         }
     })
     .catch(err => {
+        if (err.name === 'AbortError') {
+            console.log('RCA generation stopped by user.');
+            return;
+        }
+        rcaAbortController = null;
         if (elements.rcaLoading) elements.rcaLoading.classList.add('hidden');
         if (elements.rcaReportBody) {
             elements.rcaReportBody.innerHTML = `<p class="auth-error-msg">Error running RCA: ${err.message}</p>`;
         }
+        updateRcaStatusUI('error', `❌ RCA Error: ${err.message}`);
     });
 }
 
+function downloadRcaReport() {
+    if (!appState.lastRcaMarkdown) {
+        showToast("No RCA report content available to download.", "warning");
+        return;
+    }
+    const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+    const filename = `AI_RCA_Diagnostic_Report_${timestamp}.md`;
+    const blob = new Blob([appState.lastRcaMarkdown], { type: 'text/markdown;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+    showToast(`Downloaded RCA Report (${filename})`);
+}
+
 function closeRcaModal() {
-    if (elements.rcaModal) elements.rcaModal.classList.add('hidden');
+    stopRcaAnalysis();
 }
 
 function openRagModal() {
@@ -2171,6 +2458,13 @@ function closeRagDock() {
     if (elements.dockedRagWidget) elements.dockedRagWidget.classList.add('hidden');
 }
 
+function resetRagUploadButton() {
+    if (elements.btnUploadRagFile) {
+        elements.btnUploadRagFile.disabled = false;
+        elements.btnUploadRagFile.innerHTML = `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg> Parse, LLM Chunk & Ingest to Vector DB`;
+    }
+}
+
 function handleRagFileUpload(e) {
     e.preventDefault();
     if (!selectedRagFile) {
@@ -2185,7 +2479,7 @@ function handleRagFileUpload(e) {
 
     if (elements.btnUploadRagFile) {
         elements.btnUploadRagFile.disabled = true;
-        elements.btnUploadRagFile.innerText = "⌛ Ingestion Started...";
+        elements.btnUploadRagFile.innerHTML = `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg> ⌛ Ingestion Started...`;
     }
 
     if (elements.ragProgressSection) elements.ragProgressSection.classList.remove('hidden');
@@ -2210,50 +2504,59 @@ function handleRagFileUpload(e) {
     })
     .catch(err => {
         showToast(`Failed to start ingestion: ${err.message}`, 'warning');
-        if (elements.btnUploadRagFile) {
-            elements.btnUploadRagFile.disabled = false;
-            elements.btnUploadRagFile.innerText = "📤 Parse, LLM Chunk & Ingest to Vector DB";
-        }
+        resetRagUploadButton();
     });
 }
 
 function startPollingRagJob(jobId) {
-    if (activeRagJobInterval) clearInterval(activeRagJobInterval);
+    if (activeRagJobInterval) {
+        clearInterval(activeRagJobInterval);
+        activeRagJobInterval = null;
+    }
     
+    let pollCount = 0;
     activeRagJobInterval = setInterval(() => {
+        pollCount++;
         fetch(`/api/rag/jobs/${jobId}`)
         .then(res => res.json())
         .then(job => {
             updateRagJobProgressUI(job);
             
-            if (job.status === 'completed') {
-                clearInterval(activeRagJobInterval);
-                activeRagJobInterval = null;
-                showToast("Information is stored successfully!");
+            const isCompleted = job.status === 'completed' || (job.progress_percent !== undefined && job.progress_percent >= 100);
+            const isError = job.status === 'error' || job.status === 'not_found';
+
+            if (isCompleted || isError) {
+                if (activeRagJobInterval) {
+                    clearInterval(activeRagJobInterval);
+                    activeRagJobInterval = null;
+                }
+                
+                resetRagUploadButton();
                 clearSelectedRagFile();
                 fetchRagDocuments();
-                
-                if (elements.btnUploadRagFile) {
-                    elements.btnUploadRagFile.disabled = false;
-                    elements.btnUploadRagFile.innerText = "📤 Parse, LLM Chunk & Ingest to Vector DB";
+
+                if (isCompleted) {
+                    showToast("🎉 Ingestion completed successfully!");
+                    setTimeout(() => {
+                        if (elements.ragProgressSection) elements.ragProgressSection.classList.add('hidden');
+                        closeRagDock();
+                    }, 1000);
+                } else {
+                    showToast(`RAG Ingestion Error: ${job.error || 'Processing failed'}`, 'warning');
                 }
-                
-                setTimeout(() => {
-                    if (elements.ragProgressSection) elements.ragProgressSection.classList.add('hidden');
-                    closeRagDock();
-                }, 4000);
-            } else if (job.status === 'error') {
-                clearInterval(activeRagJobInterval);
-                activeRagJobInterval = null;
-                showToast(`RAG Ingestion Error: ${job.error || 'Processing failed'}`, 'warning');
-                if (elements.btnUploadRagFile) {
-                    elements.btnUploadRagFile.disabled = false;
-                    elements.btnUploadRagFile.innerText = "📤 Parse, LLM Chunk & Ingest to Vector DB";
+            } else if (pollCount > 300) { // Safety max timeout 4 minutes
+                if (activeRagJobInterval) {
+                    clearInterval(activeRagJobInterval);
+                    activeRagJobInterval = null;
                 }
+                resetRagUploadButton();
+                showToast("RAG ingestion status timed out.", "warning");
             }
         })
-        .catch(() => {});
-    }, 800);
+        .catch(err => {
+            console.error("Error polling RAG job:", err);
+        });
+    }, 2500);
 }
 
 function updateRagJobProgressUI(job) {
@@ -2375,9 +2678,11 @@ function appendChatMessage(sender, htmlContent, msgId = null) {
     msgDiv.className = `chat-message ${sender}`;
     if (msgId) msgDiv.id = msgId;
 
-    const avatarHtml = sender === 'bot' ? '🤖' : '👤';
+    const avatarHtml = sender === 'bot' 
+        ? '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="16" rx="2" ry="2"></rect><rect x="9" y="9" width="6" height="6"></rect><line x1="9" y1="1" x2="9" y2="4"></line><line x1="15" y1="1" x2="15" y2="4"></line><line x1="9" y1="20" x2="9" y2="23"></line><line x1="15" y1="20" x2="15" y2="23"></line><line x1="20" y1="9" x2="23" y2="9"></line><line x1="20" y1="15" x2="23" y2="15"></line><line x1="1" y1="9" x2="4" y2="9"></line><line x1="1" y1="15" x2="4" y2="15"></line></svg>'
+        : '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>';
     msgDiv.innerHTML = `
-        <div class="msg-avatar">${avatarHtml}</div>
+        <div class="msg-avatar" style="display: flex; align-items: center; justify-content: center;">${avatarHtml}</div>
         <div class="msg-bubble">${htmlContent}</div>
     `;
     elements.chatHistory.appendChild(msgDiv);
@@ -2438,3 +2743,250 @@ function renderMarkdownSimple(text) {
         .replace(/\n/g, '<br/>');
     return html;
 }
+
+// ----------------------------------------------------
+// Context Menu & Log Analysis
+// ----------------------------------------------------
+let contextMenuTargetRow = null;
+
+function handleRowContextMenu(e, rowData) {
+    const contextMenu = document.getElementById('row-context-menu');
+    if (!contextMenu) return;
+    
+    contextMenuTargetRow = rowData;
+    
+    // Position menu
+    contextMenu.style.top = `${e.clientY}px`;
+    contextMenu.style.left = `${e.clientX}px`;
+    contextMenu.classList.remove('hidden');
+}
+
+// Bind Context Menu Items
+document.addEventListener('DOMContentLoaded', () => {
+    const analyzeLogBtn = document.getElementById('menu-analyze-log');
+    if (analyzeLogBtn) {
+        analyzeLogBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            document.getElementById('row-context-menu').classList.add('hidden');
+            if (contextMenuTargetRow) {
+                runLogAnalysis(contextMenuTargetRow);
+            }
+        });
+    }
+});
+
+// UI Elements for Log Analysis
+const elementsLogAnalysis = {
+    modal: document.getElementById('log-analysis-modal'),
+    closeBtn: document.getElementById('log-analysis-close'),
+    loading: document.getElementById('log-analysis-loading'),
+    reportBody: document.getElementById('log-analysis-report-body'),
+    dockWidget: document.getElementById('docked-log-analysis-widget'),
+    dockStatusText: document.getElementById('docked-log-analysis-status-text'),
+    dockProgressBar: document.getElementById('docked-log-analysis-progress-bar'),
+    btnDock: document.getElementById('btn-dock-log-analysis'),
+    btnMaximizeDock: document.getElementById('btn-maximize-docked-log-analysis'),
+    btnCloseDock: document.getElementById('btn-close-docked-log-analysis'),
+    dockBody: document.getElementById('docked-log-analysis-body'),
+    btnDownload: document.getElementById('btn-download-log-analysis')
+};
+
+let logAnalysisAbortController = null;
+let logAnalysisTargetRowIndex = null; // Track which row is being analyzed
+
+function stopLogAnalysis() {
+    const wasRunning = logAnalysisAbortController !== null;
+    if (logAnalysisAbortController) {
+        logAnalysisAbortController.abort();
+        logAnalysisAbortController = null;
+    }
+    logAnalysisTargetRowIndex = null;
+    if (elementsLogAnalysis.dockWidget) elementsLogAnalysis.dockWidget.classList.add('hidden');
+    if (elementsLogAnalysis.modal) elementsLogAnalysis.modal.classList.add('hidden');
+    if (elementsLogAnalysis.loading) elementsLogAnalysis.loading.classList.add('hidden');
+    if (wasRunning) {
+        showToast("Log analysis process stopped.", "warning");
+    }
+}
+
+function updateLogAnalysisStatusUI(status, message) {
+    if (elementsLogAnalysis.dockStatusText) elementsLogAnalysis.dockStatusText.innerText = message;
+    if (elementsLogAnalysis.dockProgressBar) {
+        if (status === 'running') {
+            elementsLogAnalysis.dockProgressBar.style.width = '45%';
+            elementsLogAnalysis.dockProgressBar.style.backgroundColor = 'var(--primary)';
+        } else if (status === 'completed') {
+            elementsLogAnalysis.dockProgressBar.style.width = '100%';
+            elementsLogAnalysis.dockProgressBar.style.backgroundColor = '#10b981';
+        } else if (status === 'error') {
+            elementsLogAnalysis.dockProgressBar.style.width = '100%';
+            elementsLogAnalysis.dockProgressBar.style.backgroundColor = '#ef4444';
+        }
+    }
+}
+
+function runLogAnalysis(rowData) {
+    if (logAnalysisAbortController) {
+        logAnalysisAbortController.abort();
+    }
+    logAnalysisAbortController = new AbortController();
+
+    // Track which row index we are analyzing for live UI update on completion
+    logAnalysisTargetRowIndex = rowData.index !== undefined ? parseInt(rowData.index) : null;
+
+    if (elementsLogAnalysis.modal) elementsLogAnalysis.modal.classList.add('hidden');
+    if (elementsLogAnalysis.dockWidget) elementsLogAnalysis.dockWidget.classList.remove('hidden');
+    if (elementsLogAnalysis.loading) elementsLogAnalysis.loading.classList.remove('hidden');
+    if (elementsLogAnalysis.reportBody) elementsLogAnalysis.reportBody.innerHTML = '';
+    if (elementsLogAnalysis.btnDownload) elementsLogAnalysis.btnDownload.classList.add('hidden');
+
+    updateLogAnalysisStatusUI('running', '⚡ Analyzing log context...');
+
+    fetch('/api/analyze-log', { 
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(rowData),
+        signal: logAnalysisAbortController.signal
+    })
+    .then(res => res.json())
+    .then(data => {
+        const completedRowIndex = logAnalysisTargetRowIndex;
+        logAnalysisAbortController = null;
+        logAnalysisTargetRowIndex = null;
+
+        if (elementsLogAnalysis.loading) elementsLogAnalysis.loading.classList.add('hidden');
+        if (data.status === 'success' && elementsLogAnalysis.reportBody) {
+            appState.lastLogAnalysisMarkdown = data.report_markdown || '';
+            elementsLogAnalysis.reportBody.innerHTML = renderMarkdownSimple(data.report_markdown);
+            if (elementsLogAnalysis.btnDownload && data.report_markdown) {
+                elementsLogAnalysis.btnDownload.classList.remove('hidden');
+            }
+            updateLogAnalysisStatusUI('completed', '🎉 Analysis Complete! (Click to View)');
+            showToast('🎉 Log Analysis Generated!');
+
+            // ── Live update: patch the AI Analysis cell without a full page reload ──
+            if (completedRowIndex !== null && data.report_markdown) {
+                updateAiAnalysisCellLive(completedRowIndex, data.report_markdown);
+            }
+        } else if (elementsLogAnalysis.reportBody) {
+            const errMsg = data.message || data.detail || 'Failed to run analysis.';
+            elementsLogAnalysis.reportBody.innerHTML = `<p class="auth-error-msg">${errMsg}</p>`;
+            updateLogAnalysisStatusUI('error', `❌ Analysis Failed: ${errMsg}`);
+        }
+    })
+    .catch(err => {
+        if (err.name === 'AbortError') {
+            console.log('Log analysis request stopped by user.');
+            return;
+        }
+        logAnalysisAbortController = null;
+        logAnalysisTargetRowIndex = null;
+        if (elementsLogAnalysis.loading) elementsLogAnalysis.loading.classList.add('hidden');
+        if (elementsLogAnalysis.reportBody) {
+            elementsLogAnalysis.reportBody.innerHTML = `<p class="auth-error-msg">Error running analysis: ${err.message}</p>`;
+        }
+        updateLogAnalysisStatusUI('error', `❌ Analysis Error: ${err.message}`);
+    });
+}
+
+/**
+ * Surgically updates the "AI Analysis" column cell in the live table grid
+ * and patches in-memory appState without a full data reload.
+ */
+function updateAiAnalysisCellLive(rowIndex, reportMarkdown) {
+    // 1. Patch in-memory state
+    const allIdx = appState.allData.findIndex(r => r.index === rowIndex);
+    if (allIdx !== -1) {
+        appState.allData[allIdx]['AI Analysis'] = reportMarkdown;
+    }
+    const filtIdx = appState.filteredData.findIndex(r => r.index === rowIndex);
+    if (filtIdx !== -1) {
+        appState.filteredData[filtIdx]['AI Analysis'] = reportMarkdown;
+    }
+
+    // 2. Find the rendered row in the DOM and patch its AI Analysis cell surgically
+    const rowEl = document.querySelector(`tr[data-index="${rowIndex}"]`);
+    if (rowEl && appState.columns.includes('AI Analysis')) {
+        const colIdx = appState.columns.indexOf('AI Analysis');
+        const cells = rowEl.querySelectorAll('td');
+        const td = cells[colIdx];
+        if (td) {
+            td.innerHTML = `<button class="btn-secondary btn-sm" style="display:flex; align-items:center; gap:4px; font-size: 0.75rem; padding: 4px 8px;">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
+                View Report
+            </button>`;
+            // Flash the row to signal success
+            rowEl.classList.add('row-success');
+            setTimeout(() => rowEl.classList.remove('row-success'), 1500);
+
+            td.querySelector('button').addEventListener('click', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                if (elementsLogAnalysis.modal) elementsLogAnalysis.modal.classList.remove('hidden');
+                if (elementsLogAnalysis.loading) elementsLogAnalysis.loading.classList.add('hidden');
+                if (elementsLogAnalysis.dockWidget) elementsLogAnalysis.dockWidget.classList.add('hidden');
+                if (elementsLogAnalysis.reportBody) {
+                    appState.lastLogAnalysisMarkdown = reportMarkdown;
+                    elementsLogAnalysis.reportBody.innerHTML = renderMarkdownSimple(reportMarkdown);
+                }
+                if (elementsLogAnalysis.btnDownload) {
+                    elementsLogAnalysis.btnDownload.classList.remove('hidden');
+                }
+            });
+        }
+    }
+}
+
+function downloadLogAnalysisReport() {
+    if (!appState.lastLogAnalysisMarkdown) {
+        showToast("No analysis report content available to download.", "warning");
+        return;
+    }
+    const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+    const filename = `AI_Log_Analysis_Report_${timestamp}.md`;
+    const blob = new Blob([appState.lastLogAnalysisMarkdown], { type: 'text/markdown;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+    showToast(`Downloaded Log Analysis Report (${filename})`);
+}
+
+// Bind Log Analysis UI Events
+document.addEventListener('DOMContentLoaded', () => {
+    if (elementsLogAnalysis.btnDock) {
+        elementsLogAnalysis.btnDock.addEventListener('click', () => {
+            if (elementsLogAnalysis.modal) elementsLogAnalysis.modal.classList.add('hidden');
+            if (elementsLogAnalysis.dockWidget) elementsLogAnalysis.dockWidget.classList.remove('hidden');
+        });
+    }
+    if (elementsLogAnalysis.btnMaximizeDock) {
+        elementsLogAnalysis.btnMaximizeDock.addEventListener('click', () => {
+            if (elementsLogAnalysis.dockWidget) elementsLogAnalysis.dockWidget.classList.add('hidden');
+            if (elementsLogAnalysis.modal) elementsLogAnalysis.modal.classList.remove('hidden');
+        });
+    }
+    if (elementsLogAnalysis.dockBody) {
+        elementsLogAnalysis.dockBody.addEventListener('click', () => {
+            if (elementsLogAnalysis.dockWidget) elementsLogAnalysis.dockWidget.classList.add('hidden');
+            if (elementsLogAnalysis.modal) elementsLogAnalysis.modal.classList.remove('hidden');
+        });
+    }
+    if (elementsLogAnalysis.btnCloseDock) {
+        elementsLogAnalysis.btnCloseDock.addEventListener('click', () => {
+            stopLogAnalysis();
+        });
+    }
+    if (elementsLogAnalysis.closeBtn) {
+        elementsLogAnalysis.closeBtn.addEventListener('click', () => {
+            stopLogAnalysis();
+        });
+    }
+    if (elementsLogAnalysis.btnDownload) {
+        elementsLogAnalysis.btnDownload.addEventListener('click', downloadLogAnalysisReport);
+    }
+});

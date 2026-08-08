@@ -14,7 +14,7 @@ import uuid
 from backend.parser import DiagnosticParser
 from backend.database import (
     init_db, load_from_db, save_to_db, update_row, merge_and_deduplicate,
-    create_user, authenticate_user, create_session, get_user_by_token, delete_session
+    create_user, authenticate_user, create_session, get_user_by_token, delete_session, update_ai_analysis
 )
 from backend.rag_engine import (
     ingest_knowledge_document, ingest_file_document, 
@@ -22,6 +22,7 @@ from backend.rag_engine import (
 )
 from backend.qdrant_service import get_all_knowledge_documents, set_qdrant_config
 from backend.rca_engine import run_ai_rca_analysis, get_weekly_ai_summary
+from backend.log_analysis_engine import run_log_analysis
 from backend.chatbot_engine import process_chatbot_query
 from backend.nvidia_client import get_nvidia_model, get_nvidia_embed_model, set_nvidia_ai_config
 
@@ -109,14 +110,11 @@ def run_parsing_thread(folder_path: str):
         if not os.path.exists(folder_path):
             with state_lock:
                 state["status_logs"].append({
-                    "message": f"Path '{folder_path}' not found. Creating temporary server folder for ingestion simulation...",
+                    "message": f"Path '{folder_path}' not found. Creating folder...",
                     "level": "warning",
                     "time": datetime.now().strftime("%H:%M:%S")
                 })
             os.makedirs(folder_path, exist_ok=True)
-            for i in range(1, 11):
-                with open(os.path.join(folder_path, f"log_file_{i}.txt"), "w") as f:
-                    f.write("mock content")
 
         parser = DiagnosticParser(folder_path)
         
@@ -369,13 +367,60 @@ def rag_documents_endpoint():
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to list RAG documents: {str(e)}")
 
+import asyncio
+from fastapi import Request
+
 @app.post("/api/ai/rca")
-def ai_rca_endpoint():
+async def ai_rca_endpoint(request: Request):
+    abort_event = threading.Event()
+    
+    # Run in a separate thread so we can poll for client disconnection
+    task = asyncio.create_task(asyncio.to_thread(run_ai_rca_analysis, abort_event))
+    
+    while not task.done():
+        if await request.is_disconnected():
+            abort_event.set()
+            task.cancel()
+            print("RCA Analysis cancelled by client disconnect")
+            raise HTTPException(status_code=499, detail="Client Closed Request")
+        await asyncio.sleep(0.5)
+        
     try:
-        analysis = run_ai_rca_analysis()
-        return analysis
+        return task.result()
     except Exception as e:
+        if "Cancelled" in str(e):
+            raise HTTPException(status_code=499, detail="Cancelled")
         raise HTTPException(status_code=500, detail=f"AI RCA Analysis failed: {str(e)}")
+
+@app.post("/api/analyze-log")
+async def api_analyze_log(row_data: dict, request: Request):
+    abort_event = threading.Event()
+    
+    task = asyncio.create_task(asyncio.to_thread(run_log_analysis, row_data, abort_event))
+    
+    while not task.done():
+        if await request.is_disconnected():
+            abort_event.set()
+            task.cancel()
+            print("Log analysis cancelled by client disconnect")
+            raise HTTPException(status_code=499, detail="Client Closed Request")
+        await asyncio.sleep(0.5)
+        
+    try:
+        result = task.result()
+        if result and result.get("status") == "success":
+            row_index_str = row_data.get("index")
+            if row_index_str is not None:
+                try:
+                    row_index = int(row_index_str)
+                    update_ai_analysis(row_index, result.get("report_markdown", ""))
+                except ValueError:
+                    pass
+        return result
+    except Exception as e:
+        if "Cancelled" in str(e):
+            raise HTTPException(status_code=499, detail="Cancelled")
+        raise HTTPException(status_code=500, detail=f"Log Analysis failed: {str(e)}")
 
 @app.get("/api/ai/weekly-summary")
 def ai_weekly_summary_endpoint():
@@ -396,17 +441,15 @@ def ai_chat_endpoint(payload: ChatQueryRequest):
 @app.get("/api/settings/ai")
 def get_ai_settings():
     raw_nvidia_key = os.getenv("NVIDIA_API_KEY", "")
-    masked_nvidia_key = f"{raw_nvidia_key[:6]}...{raw_nvidia_key[-4:]}" if len(raw_nvidia_key) > 10 else (raw_nvidia_key if raw_nvidia_key else "")
     raw_qdrant_key = os.getenv("QDRANT_API_KEY", "")
-    masked_qdrant_key = f"{raw_qdrant_key[:6]}...{raw_qdrant_key[-4:]}" if len(raw_qdrant_key) > 10 else (raw_qdrant_key if raw_qdrant_key else "")
     
     return {
         "nvidia_model": get_nvidia_model(),
         "nvidia_embed_model": get_nvidia_embed_model(),
-        "nvidia_api_key_masked": masked_nvidia_key,
+        "nvidia_api_key": raw_nvidia_key,
         "nvidia_api_key_set": bool(raw_nvidia_key and not raw_nvidia_key.startswith("nvapi-your")),
         "qdrant_url": os.getenv("QDRANT_URL", ""),
-        "qdrant_api_key_masked": masked_qdrant_key,
+        "qdrant_api_key": raw_qdrant_key,
         "qdrant_api_key_set": bool(raw_qdrant_key and not raw_qdrant_key.startswith("your-"))
     }
 
@@ -426,10 +469,75 @@ def update_ai_settings(payload: AISettingsRequest):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to update AI settings: {str(e)}")
 
+@app.post("/api/settings/ai/test")
+def test_ai_settings(payload: AISettingsRequest):
+    import requests
+    from backend.nvidia_client import NVIDIA_BASE_URL
+    results = []
+
+    # 1. Test NVIDIA LLM
+    try:
+        if payload.nvidia_api_key and not payload.nvidia_api_key.startswith("nvapi-your"):
+            headers = {"Authorization": f"Bearer {payload.nvidia_api_key}", "Content-Type": "application/json"}
+            res = requests.post(f"{NVIDIA_BASE_URL}/chat/completions", headers=headers, json={
+                "model": payload.nvidia_model or "openai/gpt-oss-20b",
+                "messages": [{"role": "user", "content": "Test"}],
+                "max_tokens": 5
+            }, timeout=300)
+            if res.status_code == 200:
+                results.append("✅ NVIDIA LLM: Success")
+            else:
+                results.append(f"❌ NVIDIA LLM: {res.status_code}")
+        else:
+            results.append("⚠️ NVIDIA LLM: Key missing")
+    except Exception as e:
+        results.append(f"❌ NVIDIA LLM: {str(e)}")
+
+    # 2. Test NVIDIA Embed
+    try:
+        if payload.nvidia_api_key and not payload.nvidia_api_key.startswith("nvapi-your"):
+            headers = {"Authorization": f"Bearer {payload.nvidia_api_key}", "Content-Type": "application/json"}
+            res = requests.post(f"{NVIDIA_BASE_URL}/embeddings", headers=headers, json={
+                "input": ["test"],
+                "model": payload.nvidia_embed_model or "nvidia/nv-embedqa-e5-v5",
+                "input_type": "query"
+            }, timeout=30)
+            if res.status_code == 200:
+                results.append("✅ NVIDIA Embed: Success")
+            else:
+                results.append(f"❌ NVIDIA Embed: {res.status_code}")
+        else:
+            results.append("⚠️ NVIDIA Embed: Key missing")
+    except Exception as e:
+        results.append(f"❌ NVIDIA Embed: {str(e)}")
+
+    # 3. Test Qdrant
+    try:
+        if payload.qdrant_url and payload.qdrant_api_key and not payload.qdrant_api_key.startswith("your-"):
+            from qdrant_client import QdrantClient
+            client = QdrantClient(url=payload.qdrant_url, api_key=payload.qdrant_api_key, timeout=20.0)
+            client.get_collections()
+            results.append("✅ Qdrant DB: Success")
+        else:
+            results.append("⚠️ Qdrant DB: Missing URL/Key")
+    except Exception as e:
+        results.append(f"❌ Qdrant DB: {str(e)}")
+
+    return {"status": "success", "results": results}
+
+# Custom StaticFiles wrapper to prevent AssertionError on WebSocket scopes
+class SPAStaticFiles(StaticFiles):
+    async def __call__(self, scope, receive, send):
+        if scope["type"] != "http":
+            if scope["type"] == "websocket":
+                await send({"type": "websocket.close", "code": 1000})
+            return
+        await super().__call__(scope, receive, send)
+
 # Mount frontend files
 frontend_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "frontend")
 if os.path.exists(frontend_dir):
-    app.mount("/", StaticFiles(directory=frontend_dir, html=True), name="frontend")
+    app.mount("/", SPAStaticFiles(directory=frontend_dir, html=True), name="frontend")
 else:
     # Handle case where frontend folder is missing initially
     @app.get("/")

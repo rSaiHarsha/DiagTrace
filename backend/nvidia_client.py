@@ -13,7 +13,7 @@ def get_nvidia_api_key() -> str:
     return os.getenv("NVIDIA_API_KEY", "").strip()
 
 def get_nvidia_model() -> str:
-    return os.getenv("NVIDIA_MODEL_NAME", "meta/llama-3.3-70b-instruct").strip()
+    return os.getenv("NVIDIA_MODEL_NAME", "openai/gpt-oss-20b").strip()
 
 def get_nvidia_embed_model() -> str:
     return os.getenv("NVIDIA_EMBED_MODEL", "nvidia/nv-embedqa-e5-v5").strip()
@@ -49,10 +49,12 @@ def set_nvidia_ai_config(api_key: Optional[str] = None, model_name: Optional[str
     except Exception as e:
         print(f"Failed to update .env: {e}")
 
-def query_nvidia_llm(prompt: str, system_prompt: Optional[str] = None, temperature: float = 0.2, max_tokens: int = 1500) -> str:
-    """Queries NVIDIA NIM API for LLM completion. Raises explicit error on failure."""
+import time
+
+def query_nvidia_llm(prompt: str, system_prompt: Optional[str] = None, temperature: float = 0.2, max_tokens: int = 2500, timeout: int = 600, abort_event: Optional[Any] = None) -> str:
+    """Queries NVIDIA NIM API for LLM completion with automatic 503 retries and fallback model support."""
     api_key = get_nvidia_api_key()
-    model = get_nvidia_model()
+    primary_model = get_nvidia_model()
     
     if not api_key or api_key.startswith("nvapi-your-key"):
         raise RuntimeError("NVIDIA_API_KEY is missing or invalid. Please enter your valid NVIDIA API Key in Settings (⚙️ Settings -> 🤖 AI Models & Keys).")
@@ -68,35 +70,90 @@ def query_nvidia_llm(prompt: str, system_prompt: Optional[str] = None, temperatu
         "Content-Type": "application/json",
         "Accept": "application/json"
     }
-    payload = {
-        "model": model,
-        "messages": [
-            {"role": "system", "content": system_prompt},
-            {"role": "user", "content": prompt}
-        ],
-        "temperature": temperature,
-        "max_tokens": max_tokens,
-        "stream": False
-    }
+
+    # Use strictly the configured primary model (no hardcoded fallbacks)
+    candidate_models = [primary_model]
+
+    last_error_msg = ""
     
-    try:
-        res = requests.post(f"{NVIDIA_BASE_URL}/chat/completions", headers=headers, json=payload, timeout=30)
-        if res.status_code == 200:
-            data = res.json()
-            if "choices" in data and len(data["choices"]) > 0:
-                return data["choices"][0]["message"]["content"].strip()
-            raise RuntimeError(f"NVIDIA API returned empty choices payload: {res.text}")
-        else:
+    for current_model in candidate_models:
+        payload = {
+            "model": current_model,
+            "messages": [
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": prompt}
+            ],
+            "temperature": temperature,
+            "max_tokens": max_tokens,
+            "stream": True  # Stream to allow abort polling
+        }
+
+        # Attempt up to 3 retries per model for transient 503 / 429 / connection issues
+        for attempt in range(1, 4):
             try:
-                err_data = res.json()
-                err_msg = err_data.get("detail") or err_data.get("message") or res.text
-            except Exception:
-                err_msg = res.text
-            if res.status_code in (401, 403):
-                raise RuntimeError(f"NVIDIA API Authorization Failed (HTTP {res.status_code}): Invalid or unauthenticated API key. Please open '⚙️ Settings' -> '🤖 AI Models & Keys' to enter your valid key starting with 'nvapi-' (obtainable for free at build.nvidia.com).")
-            raise RuntimeError(f"NVIDIA API Call Failed ({res.status_code}): {err_msg}")
-    except requests.exceptions.RequestException as e:
-        raise RuntimeError(f"NVIDIA API Connection Error: {str(e)}")
+                if abort_event and abort_event.is_set():
+                    raise InterruptedError("LLM Generation cancelled by user.")
+                
+                with requests.post(f"{NVIDIA_BASE_URL}/chat/completions", headers=headers, json=payload, timeout=timeout, stream=True) as res:
+                    if res.status_code == 200:
+                        content_parts = []
+                        for line in res.iter_lines():
+                            if abort_event and abort_event.is_set():
+                                raise InterruptedError("LLM Generation cancelled by user.")
+                            if line:
+                                line_str = line.decode('utf-8')
+                                if line_str.startswith("data: "):
+                                    data_str = line_str[6:].strip()
+                                    if data_str == "[DONE]":
+                                        break
+                                    try:
+                                        data_obj = json.loads(data_str)
+                                        if "choices" in data_obj and len(data_obj["choices"]) > 0:
+                                            delta = data_obj["choices"][0].get("delta", {})
+                                            if "content" in delta:
+                                                content_parts.append(delta["content"])
+                                    except Exception:
+                                        pass
+                        return "".join(content_parts).strip()
+                    else:
+                        err_text = res.text
+                        try:
+                            err_data = json.loads(err_text)
+                            err_msg = err_data.get("detail") or err_data.get("message") or err_text
+                            if isinstance(err_data.get("error"), dict) and "message" in err_data["error"]:
+                                err_msg = err_data["error"]["message"]
+                        except Exception:
+                            err_msg = err_text
+
+                last_error_msg = f"HTTP {res.status_code}: {err_msg}"
+
+                if res.status_code in (401, 403):
+                    raise RuntimeError(f"NVIDIA API Authorization Failed (HTTP {res.status_code}): Invalid or unauthenticated API key. Please open '⚙️ Settings' -> '🤖 AI Models & Keys' to enter your valid key starting with 'nvapi-'.")
+                
+                # Transient rate limit or worker queue exhaustion (503 / 429 / 504) -> retry with backoff
+                if res.status_code in (503, 429, 504, 502):
+                    wait_time = attempt * 2  # 2s, 4s, 6s
+                    print(f"⚠️ [NVIDIA API {res.status_code}] Model '{current_model}' busy ({err_msg}). Retrying in {wait_time}s (Attempt {attempt}/3)...")
+                    
+                    # Sleep interruptably
+                    for _ in range(wait_time * 10):
+                        if abort_event and abort_event.is_set():
+                            raise InterruptedError("LLM Generation cancelled by user.")
+                        time.sleep(0.1)
+                    continue
+                else:
+                    # Non-retryable HTTP error for this model, try next model candidate
+                    break
+
+            except requests.exceptions.RequestException as e:
+                last_error_msg = f"Connection Error: {str(e)}"
+                wait_time = attempt * 2
+                for _ in range(wait_time * 10):
+                    if abort_event and abort_event.is_set():
+                        raise InterruptedError("LLM Generation cancelled by user.")
+                    time.sleep(0.1)
+
+    raise RuntimeError(f"NVIDIA API Call Failed after retries: {last_error_msg}")
 
 def get_nvidia_embedding(text: str) -> List[float]:
     """Generates embedding vector via NVIDIA Embedding NIM or fallback hash vector if key is not configured."""

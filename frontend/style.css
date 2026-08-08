@@ -117,23 +117,34 @@ body {
     transition: background-color 0.3s ease, color 0.3s ease;
 }
 
-/* Scrollbar customizations */
+/* Sleek Micro Scrollbar Design System for All Dialogs & Containers */
+* {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(59, 130, 246, 0.4) transparent;
+}
+
 ::-webkit-scrollbar {
-    width: 8px;
-    height: 8px;
+    width: 5px;
+    height: 5px;
 }
 
 ::-webkit-scrollbar-track {
-    background: rgba(0, 0, 0, 0.05);
+    background: transparent;
+    border-radius: 10px;
 }
 
 ::-webkit-scrollbar-thumb {
-    background: var(--text-muted);
-    border-radius: 4px;
+    background: rgba(59, 130, 246, 0.35);
+    border-radius: 10px;
+    transition: background 0.2s ease, transform 0.2s ease;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-    background: var(--text-secondary);
+    background: var(--primary);
+}
+
+::-webkit-scrollbar-corner {
+    background: transparent;
 }
 
 /* Header Styles */
@@ -565,11 +576,26 @@ body {
 }
 
 .data-table tbody tr {
-    height: 32px;
+    height: 36px;
+    transition: background-color 0.15s ease, box-shadow 0.15s ease;
 }
 
 .data-table tbody tr:hover {
-    background-color: var(--bg-card-hover);
+    background-color: rgba(99, 102, 241, 0.15) !important;
+    cursor: pointer;
+}
+
+.btn-analyze-row {
+    background: linear-gradient(135deg, var(--primary) 0%, #4f46e5 100%);
+    color: white;
+    border: none;
+    box-shadow: 0 2px 4px rgba(99, 102, 241, 0.2);
+    transition: transform 0.1s ease, box-shadow 0.15s ease;
+}
+
+.btn-analyze-row:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 8px rgba(99, 102, 241, 0.4);
 }
 
 .data-table td.no-data {
@@ -1160,7 +1186,7 @@ body {
     align-items: center;
     gap: 8px;
     font-size: 0.78rem;
-    z-index: 200;
+    z-index: 10005;
     transition: transform 0.25s cubic-bezier(0.175, 0.885, 0.32, 1.15), opacity 0.25s ease;
 }
 
@@ -1336,6 +1362,141 @@ custom-dropdown, .custom-dropdown {
 }
 .dropdown-option:hover{
     background: rgba(59, 130, 246, 0.15);
+}
+
+/* ----------------------------------------------------
+   Checkbox Multi-Select Filter Panels
+   ---------------------------------------------------- */
+.chk-dropdown {
+    position: relative;
+    font-size: 0.7rem;
+}
+
+.chk-dropdown-trigger {
+    width: 100%;
+    padding: 3px 6px;
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    background: var(--bg-card);
+    color: var(--text-primary);
+    font-size: 0.7rem;
+    font-family: var(--font-sans);
+    cursor: pointer;
+    text-align: left;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.chk-dropdown-trigger:hover {
+    border-color: var(--primary);
+    background: var(--bg-card-hover);
+}
+
+.chk-dropdown-trigger.chk-active {
+    border-color: var(--primary);
+    color: var(--primary);
+    background: rgba(59, 130, 246, 0.06);
+    font-weight: 600;
+}
+
+.chk-dropdown-panel {
+    position: absolute;
+    top: calc(100% + 2px);
+    left: 0;
+    min-width: 160px;
+    width: max-content;
+    max-width: 280px;
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    box-shadow: 0 6px 20px rgba(0,0,0,0.15);
+    z-index: 10000;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.chk-dropdown-panel.hidden {
+    display: none !important;
+}
+
+.chk-dropdown-search {
+    width: 100%;
+    padding: 5px 8px;
+    border: none;
+    border-bottom: 1px solid var(--border-color);
+    background: var(--bg-main);
+    color: var(--text-primary);
+    font-size: 0.7rem;
+    font-family: var(--font-sans);
+    outline: none;
+}
+
+.chk-options-list {
+    max-height: 180px;
+    overflow-y: auto;
+    padding: 4px 0;
+}
+
+.chk-filter-label {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 10px;
+    cursor: pointer;
+    font-size: 0.7rem;
+    color: var(--text-primary);
+    white-space: nowrap;
+    transition: background 0.1s ease;
+}
+
+.chk-filter-label:hover {
+    background: rgba(59, 130, 246, 0.1);
+}
+
+.chk-filter-option {
+    accent-color: var(--primary);
+    cursor: pointer;
+    width: 13px;
+    height: 13px;
+    flex-shrink: 0;
+}
+
+.chk-filter-text {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    max-width: 220px;
+}
+
+.chk-footer {
+    padding: 4px 8px;
+    border-top: 1px solid var(--border-color);
+    background: rgba(0,0,0,0.02);
+    display: flex;
+    justify-content: flex-end;
+}
+
+.chk-clear-btn {
+    background: none;
+    border: none;
+    color: var(--text-muted);
+    font-size: 0.68rem;
+    cursor: pointer;
+    padding: 2px 4px;
+    border-radius: 3px;
+    transition: color 0.15s ease;
+}
+
+.chk-clear-btn:hover {
+    color: var(--error);
+}
+
+/* Raise z-index of sticky th when its checkbox panel is open */
+.data-table th:has(.chk-dropdown-panel:not(.hidden)) {
+    z-index: 100;
 }
 
 /* ----------------------------------------------------
@@ -1707,7 +1868,7 @@ custom-dropdown, .custom-dropdown {
 /* Floating Docked Progress Widget (Bottom Right Viewport) */
 .docked-rag-widget {
     position: fixed;
-    bottom: 24px;
+    bottom: 100px;
     right: 24px;
     width: 320px;
     background: var(--bg-card);
@@ -1835,6 +1996,10 @@ custom-dropdown, .custom-dropdown {
     outline-offset: 2px;
 }
 
+.theme-option-card input[type="radio"]:checked ~ .theme-check-icon {
+    display: flex !important;
+}
+
 .theme-preview {
     width: 100%;
     height: 36px;
@@ -1871,6 +2036,14 @@ custom-dropdown, .custom-dropdown {
     max-height: 85vh;
     display: flex;
     flex-direction: column;
+    overflow: hidden;
+}
+
+.rca-modal-body {
+    flex: 1;
+    overflow-y: auto;
+    max-height: calc(85vh - 75px);
+    padding: 20px 24px;
 }
 
 .rca-loading {
@@ -2149,6 +2322,41 @@ custom-dropdown, .custom-dropdown {
 
 .chat-submit-btn:hover {
     background: var(--primary-hover);
+}
+
+/* Custom Context Menu */
+.context-menu {
+    position: fixed;
+    background-color: var(--bg-card, #1e293b);
+    border: 1px solid var(--border-color, #334155);
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.4);
+    border-radius: 8px;
+    padding: 6px 0;
+    min-width: 180px;
+    z-index: 10000;
+    font-family: inherit;
+}
+
+.context-menu-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+}
+
+.context-menu-item {
+    padding: 10px 16px;
+    font-size: 0.88rem;
+    color: var(--text-primary, #f8fafc);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    transition: background-color 0.15s, color 0.15s;
+}
+
+.context-menu-item:hover {
+    background-color: var(--primary, #6366f1);
+    color: #ffffff;
 }
 
 
