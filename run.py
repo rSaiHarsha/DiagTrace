@@ -38,7 +38,6 @@ def run():
         python_exe = venv_python
     else:
         python_exe = sys.executable
-<<<<<<< HEAD
 
     host = os.getenv("HOST", "127.0.0.1")
     port = os.getenv("PORT", "8000")
@@ -70,26 +69,6 @@ def run():
     try:
         proc = subprocess.Popen(cmd, cwd=workspace_dir)
         proc.wait()
-=======
-        
-    print(f"Active Python interpreter: {python_exe}")
-    print("Starting FastAPI Backend (Uvicorn) on http://127.0.0.1:5000 ...")
-    
-    try:
-        backend_proc = subprocess.Popen([
-            python_exe, "-m", "uvicorn", "backend.main:app", 
-            "--host", "127.0.0.1", "--port", "5000"
-        ])
-        
-        while True:
-            # Periodically poll process status
-            backend_rc = backend_proc.poll()
-            if backend_rc is not None:
-                print(f"Backend process terminated with code {backend_rc}")
-                break
-            time.sleep(1)
-            
->>>>>>> be3c2e7364f214318decc822c5793bc392ba1301
     except KeyboardInterrupt:
         print("\n[INFO] Graceful shutdown requested. Stopping server...")
     finally:
