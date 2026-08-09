@@ -27,6 +27,7 @@ def init_qdrant_storage():
                     created_at TEXT NOT NULL
                 )
             """)
+            cursor.execute("UPDATE rag_knowledge_base SET category = 'System Requirements' WHERE category = 'Jira & Requirements' OR category = 'Jira'")
             conn.commit()
             conn.close()
         except Exception as e:
@@ -284,8 +285,16 @@ def get_knowledge_chunks(category: Optional[str] = None, search: Optional[str] =
             params = []
             
             if category and category.lower() != "all":
-                conditions.append("category = ?")
-                params.append(category)
+                cat_lower = category.strip().lower()
+                if cat_lower in ["jira", "jira tickets"]:
+                    conditions.append("(category = ? OR category = ? OR category LIKE ?)")
+                    params.extend(["Jira", "Jira Tickets", "%Jira%"])
+                elif cat_lower in ["system requirements", "requirements"]:
+                    conditions.append("(category = ? OR category LIKE ?)")
+                    params.extend(["System Requirements", "%Requirements%"])
+                else:
+                    conditions.append("category = ?")
+                    params.append(category)
                 
             if search and search.strip():
                 conditions.append("(content LIKE ? OR title LIKE ?)")

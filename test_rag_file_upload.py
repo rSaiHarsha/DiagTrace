@@ -40,7 +40,7 @@ class TestRAGFileUpload(unittest.TestCase):
             "Diagnostic Code C0045 indicates brake pressure sensor malfunction."
         ).encode('utf-8')
         
-        res = ingest_file_document("bcm_manual.txt", sample_txt, category="Jira & Requirements")
+        res = ingest_file_document("bcm_manual.txt", sample_txt, category="System Requirements")
         self.assertEqual(res.get("status"), "success")
         self.assertTrue(res.get("total_chunks") > 0)
         print(f"[OK] File document ingestion test passed ({res['total_chunks']} chunks created).")
