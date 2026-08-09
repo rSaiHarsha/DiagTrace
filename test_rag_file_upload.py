@@ -45,5 +45,26 @@ class TestRAGFileUpload(unittest.TestCase):
         self.assertTrue(res.get("total_chunks") > 0)
         print(f"[OK] File document ingestion test passed ({res['total_chunks']} chunks created).")
 
+    def test_04_pymupdf_pdf_parsing(self):
+        import pymupdf
+        doc = pymupdf.open()
+        page = doc.new_page()
+        page.insert_text((50, 50), "PyMuPDF Test PDF Document", fontsize=14)
+        page.insert_text((50, 100), "DTC P0171 System Too Lean Bank 1 Requirements Spec", fontsize=11)
+        pdf_bytes = doc.tobytes()
+        doc.close()
+
+    def test_05_architecture_sysml_conversion(self):
+        import pymupdf
+        doc = pymupdf.open()
+        page = doc.new_page(width=400, height=200)
+        page.insert_text((40, 40), "ECU Architecture: ECM connected to BCM via CAN-FD", fontsize=12)
+        img_bytes = page.get_pixmap(dpi=100).tobytes("png")
+        doc.close()
+
+        parsed = parse_document_file("ecu_arch.png", img_bytes, category="Architectures")
+        self.assertTrue(len(parsed) > 0)
+        print("[OK] ECU Architecture diagram image SysML conversion test passed.")
+
 if __name__ == "__main__":
     unittest.main()

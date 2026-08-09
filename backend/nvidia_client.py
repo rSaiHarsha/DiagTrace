@@ -155,6 +155,81 @@ def query_nvidia_llm(prompt: str, system_prompt: Optional[str] = None, temperatu
 
     raise RuntimeError(f"NVIDIA API Call Failed after retries: {last_error_msg}")
 
+def get_nvidia_vision_model() -> str:
+    return os.getenv("NVIDIA_VISION_MODEL", "meta/llama-3.2-11b-vision-instruct").strip()
+
+def query_nvidia_vision_ocr(image_base64: str, prompt: Optional[str] = None, timeout: int = 90) -> str:
+    """Uses NVIDIA Build Vision / OCR Model (meta/llama-3.2-11b-vision-instruct) to extract high-fidelity text, layout structure, tables, and handwritten/scanned content from document page images."""
+    api_key = get_nvidia_api_key()
+    if not api_key or api_key.startswith("nvapi-your-key"):
+        raise RuntimeError("NVIDIA_API_KEY is missing or invalid.")
+        
+    vision_model = get_nvidia_vision_model()
+    
+    if not prompt:
+        prompt = (
+            "You are an expert Document Layout & OCR Extraction AI. "
+            "Analyze this page image carefully and extract all text content, section headings, bullet points, structured data tables, and technical annotations. "
+            "Format the extracted content as clean, well-structured Markdown. Output ONLY the extracted document text and Markdown tables."
+        )
+
+    headers = {
+        "Authorization": f"Bearer {api_key}",
+        "Content-Type": "application/json"
+    }
+
+    if not image_base64.startswith("data:image/"):
+        image_url_val = f"data:image/png;base64,{image_base64}"
+    else:
+        image_url_val = image_base64
+
+    payload = {
+        "model": vision_model,
+        "messages": [
+            {
+                "role": "user",
+                "content": [
+                    {"type": "text", "text": prompt},
+                    {
+                        "type": "image_url",
+                        "image_url": {"url": image_url_val}
+                    }
+                ]
+            }
+        ],
+        "temperature": 0.1,
+        "max_tokens": 2048
+    }
+
+    try:
+        res = requests.post(f"{NVIDIA_BASE_URL}/chat/completions", headers=headers, json=payload, timeout=timeout)
+        if res.status_code == 200:
+            data = res.json()
+            if "choices" in data and len(data["choices"]) > 0:
+                content = data["choices"][0]["message"]["content"]
+                return content.strip()
+            raise RuntimeError("NVIDIA Vision API returned invalid response payload.")
+        else:
+            raise RuntimeError(f"NVIDIA Vision OCR API error ({res.status_code}): {res.text}")
+    except Exception as e:
+        print(f"NVIDIA Vision OCR Exception: {e}")
+        raise
+
+def query_nvidia_vision_sysml(image_base64: str, timeout: int = 120) -> str:
+    """Uses NVIDIA Llama 3.2 Vision Model to analyze diagram images. Converts ECU Architecture/UML/Network diagrams into formal SysML (v2/PlantUML) code and detailed component/interface context."""
+    system_prompt = (
+        "You are an expert Automotive Systems Architect & SysML/UML Specialist.\n"
+        "Analyze the provided document or diagram image carefully.\n\n"
+        "1. DIAGRAM DEPICTION & SYSML CODE CONVERSION:\n"
+        "   - Accurately depict and model the diagram by generating formal, valid SysML v2 code (`package ... { part def ... }`) AND PlantUML code (`@startuml ... @enduml`) representing all components (ECUs, Domain Controllers, Sensors, Actuators), ports, buses (CAN-FD, LIN, Ethernet), signals, and sequence flows.\n"
+        "2. COMPONENT & INTERFACE BREAKDOWN:\n"
+        "   - Provide a structured Markdown component analysis detailing each ECU/module, its ports, bus speed/protocol, and signal relationships.\n"
+        "3. IF NOT A DIAGRAM:\n"
+        "   - Extract a detailed technical summary of all visible content, data tables, and specifications.\n\n"
+        "Format the output starting directly with the [SYSML_SPEC] code depiction block followed by [COMPONENT_ANALYSIS]."
+    )
+    return query_nvidia_vision_ocr(image_base64, prompt=system_prompt, timeout=timeout)
+
 def get_nvidia_embedding(text: str) -> List[float]:
     """Generates embedding vector via NVIDIA Embedding NIM or fallback hash vector if key is not configured."""
     api_key = get_nvidia_api_key()

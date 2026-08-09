@@ -13,8 +13,8 @@ def open_browser(url: str):
     time.sleep(1.0)
     for _ in range(20):
         try:
-            with urllib.request.urlopen(f"{url}/api/version", timeout=1) as resp:
-                if resp.status == 200:
+            with urllib.request.urlopen(f"{url}/", timeout=1) as resp:
+                if resp.status in (200, 304, 307):
                     webbrowser.open(url)
                     return
         except Exception:
@@ -29,15 +29,17 @@ def run():
     workspace_dir = os.path.dirname(os.path.abspath(__file__))
     
     # 1. Detect Python interpreter (prefer project venv if present)
-    if os.name == 'nt':
-        venv_python = os.path.join(workspace_dir, "venv", "Scripts", "python.exe")
-    else:
-        venv_python = os.path.join(workspace_dir, "venv", "bin", "python")
-        
-    if os.path.exists(venv_python):
-        python_exe = venv_python
-    else:
-        python_exe = sys.executable
+    venv_candidates = [
+        os.path.join(workspace_dir, ".venv", "Scripts", "python.exe") if os.name == 'nt' else os.path.join(workspace_dir, ".venv", "bin", "python"),
+        os.path.join(os.path.dirname(workspace_dir), ".venv", "Scripts", "python.exe") if os.name == 'nt' else os.path.join(os.path.dirname(workspace_dir), ".venv", "bin", "python"),
+        os.path.join(workspace_dir, "venv", "Scripts", "python.exe") if os.name == 'nt' else os.path.join(workspace_dir, "venv", "bin", "python"),
+    ]
+    
+    python_exe = sys.executable
+    for candidate in venv_candidates:
+        if os.path.exists(candidate):
+            python_exe = candidate
+            break
 
     host = os.getenv("HOST", "127.0.0.1")
     port = os.getenv("PORT", "8000")

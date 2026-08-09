@@ -1,5 +1,15 @@
 // Knowledge Base (RAG) JavaScript Logic
 
+function escapeHtml(str) {
+    if (str === null || str === undefined) return '';
+    return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+}
+
 document.addEventListener('DOMContentLoaded', () => {
     const ragElements = {
         ragTabFile: document.getElementById('rag-tab-file'),
@@ -397,11 +407,16 @@ function loadRagChunks(page = 1) {
     if (search.trim() !== '') url += `&search=${encodeURIComponent(search)}`;
     
     fetch(url)
-    .then(res => res.json())
+    .then(res => {
+        if (!res.ok) {
+            return res.json().then(errData => { throw new Error(errData.detail || `HTTP ${res.status}`); }).catch(() => { throw new Error(`HTTP ${res.status}: ${res.statusText}`); });
+        }
+        return res.json();
+    })
     .then(data => {
         elements.ragChunksContainer.innerHTML = '';
         
-        if (!data.chunks || data.chunks.length === 0) {
+        if (!data || !data.chunks || data.chunks.length === 0) {
             elements.ragChunksContainer.innerHTML = '<div style="padding: 20px; text-align: center; color: var(--text-secondary);">No chunks found for this criteria.</div>';
             if (elements.ragChunkCount) elements.ragChunkCount.innerText = "Showing 0 items";
             ragChunkTotalPages = 1;
@@ -410,8 +425,14 @@ function loadRagChunks(page = 1) {
         }
         
         data.chunks.forEach(chunk => {
-            const date = new Date(chunk.created_at).toLocaleString();
-            
+            const date = chunk.created_at ? new Date(chunk.created_at).toLocaleString() : 'N/A';
+            const titleEsc = escapeHtml(chunk.title || 'Untitled Chunk');
+            const categoryEsc = escapeHtml(chunk.category || 'General');
+            const chunkIdEsc = escapeHtml(chunk.id || '');
+            const rawContent = chunk.content || '';
+            const shortContent = rawContent.length > 200 ? rawContent.substring(0, 200) + '...' : rawContent;
+            const contentEsc = escapeHtml(shortContent);
+
             const card = document.createElement('div');
             card.className = 'card';
             card.style.padding = '15px';
@@ -426,21 +447,19 @@ function loadRagChunks(page = 1) {
             card.onmouseover = () => { card.style.borderColor = 'var(--primary)'; };
             card.onmouseout = () => { card.style.borderColor = 'var(--border-color)'; };
 
-            const shortContent = chunk.content.length > 200 ? chunk.content.substring(0, 200) + '...' : chunk.content;
-
             card.innerHTML = `
                 <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 8px;">
-                    <div style="font-weight: 600; color: var(--primary); font-size: 0.95rem; flex: 1; margin-right: 10px;">${chunk.title}</div>
+                    <div style="font-weight: 600; color: var(--primary); font-size: 0.95rem; flex: 1; margin-right: 10px;">${titleEsc}</div>
                     <div style="display: flex; align-items: center; gap: 8px; flex-shrink: 0;">
-                        <span style="font-size: 0.8rem; color: var(--text-secondary); background: var(--bg-tertiary); padding: 2px 6px; border-radius: 4px;">${chunk.category}</span>
+                        <span style="font-size: 0.8rem; color: var(--text-secondary); background: var(--bg-tertiary); padding: 2px 6px; border-radius: 4px;">${categoryEsc}</span>
                         <button class="btn-delete-chunk-card" title="Delete Chunk" style="background: rgba(239, 68, 68, 0.12); border: 1px solid rgba(239, 68, 68, 0.35); color: #ef4444; border-radius: 4px; padding: 3px 8px; cursor: pointer; font-size: 0.78rem; display: inline-flex; align-items: center; gap: 4px; font-weight: 500; transition: all 0.2s;">
                             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
                             Delete
                         </button>
                     </div>
                 </div>
-                <div style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 10px;">ID: ${chunk.id} • Added: ${date}</div>
-                <div style="font-size: 0.9rem; line-height: 1.5; color: var(--text-primary); opacity: 0.85; white-space: pre-wrap; word-break: break-word;">${shortContent}</div>
+                <div style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 10px;">ID: ${chunkIdEsc} • Added: ${date}</div>
+                <div style="font-size: 0.9rem; line-height: 1.5; color: var(--text-primary); opacity: 0.85; white-space: pre-wrap; word-break: break-word;">${contentEsc}</div>
                 <div style="font-size: 0.8rem; color: var(--primary); margin-top: 10px; font-weight: 500;">Click to view full content →</div>
             `;
             
@@ -459,12 +478,12 @@ function loadRagChunks(page = 1) {
             elements.ragChunksContainer.appendChild(card);
         });
         
-        const total = data.total;
+        const total = data.total || 0;
         ragChunkTotalPages = Math.ceil(total / pageSize) || 1;
         updateRagChunkPagination(page, ragChunkTotalPages, total, pageSize);
     })
     .catch(err => {
-        elements.ragChunksContainer.innerHTML = `<div style="padding: 20px; text-align: center; color: #ef4444;">Error loading chunks: ${err.message}</div>`;
+        elements.ragChunksContainer.innerHTML = `<div style="padding: 20px; text-align: center; color: #ef4444;">Error loading chunks: ${escapeHtml(err.message)}</div>`;
     });
 }
 

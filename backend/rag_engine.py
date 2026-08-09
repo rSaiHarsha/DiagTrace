@@ -1,3 +1,4 @@
+import os
 import uuid
 import json
 import re
@@ -119,15 +120,15 @@ def process_file_ingestion_background(job_id: str, file_name: str, file_bytes: b
         "progress_percent": 10.0,
         "current_page": 0,
         "total_pages": 1,
-        "logs": [f"📁 Received document '{file_name}' ({len(file_bytes)} bytes)"],
+        "logs": [f"[INFO] Received document '{file_name}' ({len(file_bytes)} bytes)"],
         "total_chunks": 0,
         "error": None
     }
     
     try:
         # Step 1: Document Text Parsing
-        RAG_JOBS[job_id]["logs"].append(f"📄 Extracting text content from {file_name}...")
-        raw_text = parse_document_file(file_name, file_bytes)
+        RAG_JOBS[job_id]["logs"].append(f"[PARSER] Extracting text content from {file_name}...")
+        raw_text = parse_document_file(file_name, file_bytes, category=category)
         
         if not raw_text or not raw_text.strip():
             raise ValueError(f"Unable to extract text from file '{file_name}'.")
@@ -137,15 +138,25 @@ def process_file_ingestion_background(job_id: str, file_name: str, file_bytes: b
             
         RAG_JOBS[job_id]["total_pages"] = total_pages
         RAG_JOBS[job_id]["progress_percent"] = 25.0
-        RAG_JOBS[job_id]["logs"].append(f"✅ Text extracted successfully: {len(raw_text)} characters (~{total_pages} pages/sections)")
+        RAG_JOBS[job_id]["logs"].append(f"[PARSER] Text extracted successfully: {len(raw_text)} characters (~{total_pages} pages/sections)")
 
-        # Step 2: LLM Semantic Boundary Chunking
-        RAG_JOBS[job_id]["logs"].append("🤖 Performing LLM Semantic Boundary Chunking...")
-        RAG_JOBS[job_id]["progress_percent"] = 40.0
-        
-        chunks = llm_semantic_chunking(raw_text, file_name, job_id=job_id)
-        
-        RAG_JOBS[job_id]["logs"].append(f"✅ LLM Semantic Chunking complete: Generated {len(chunks)} cohesive chunks")
+        # Step 2: Chunking Strategy
+        ext = os.path.splitext(file_name)[1].lower()
+        is_image = ext in ['.png', '.jpg', '.jpeg', '.webp', '.bmp', '.tiff']
+        is_architecture = bool(category and "architecture" in category.lower())
+
+        if is_image or is_architecture:
+            RAG_JOBS[job_id]["logs"].append("[CHUNK] Creating single unified chunk for ECU Architecture diagram...")
+            chunks = [{
+                "title": "SysML Architecture Spec & Diagram Model",
+                "content": raw_text
+            }]
+            RAG_JOBS[job_id]["logs"].append("[CHUNK] Preserved single unified SysML chunk for complete diagram context")
+        else:
+            RAG_JOBS[job_id]["logs"].append("[LLM_CHUNK] Performing LLM Semantic Boundary Chunking...")
+            chunks = llm_semantic_chunking(raw_text, file_name, job_id=job_id)
+            RAG_JOBS[job_id]["logs"].append(f"[LLM_CHUNK] Semantic Chunking complete: Generated {len(chunks)} cohesive chunks")
+            
         RAG_JOBS[job_id]["progress_percent"] = 65.0
 
         # Step 3: Vector Embeddings & Storage
@@ -153,7 +164,7 @@ def process_file_ingestion_background(job_id: str, file_name: str, file_bytes: b
         for idx, chunk in enumerate(chunks):
             pct = 65.0 + ((idx + 1) / max(1, len(chunks))) * 30.0
             RAG_JOBS[job_id]["progress_percent"] = min(95.0, round(pct, 1))
-            RAG_JOBS[job_id]["logs"].append(f"⚡ Generating vector embedding for chunk {idx+1}/{len(chunks)}: '{chunk['title'][:45]}...'")
+            RAG_JOBS[job_id]["logs"].append(f"[VECTOR] Generating vector embedding for chunk {idx+1}/{len(chunks)}: '{chunk['title'][:45]}...'")
             
             doc_id = f"doc_{uuid.uuid4().hex[:10]}"
             chunk_title = f"[{file_name}] {chunk['title']}"
@@ -171,12 +182,12 @@ def process_file_ingestion_background(job_id: str, file_name: str, file_bytes: b
         RAG_JOBS[job_id]["status"] = "completed"
         RAG_JOBS[job_id]["progress_percent"] = 100.0
         RAG_JOBS[job_id]["total_chunks"] = len(stored_items)
-        RAG_JOBS[job_id]["logs"].append(f"🎉 RAG Ingestion Complete! Stored {len(stored_items)} chunks into Qdrant & Vector DB.")
+        RAG_JOBS[job_id]["logs"].append(f"[SUCCESS] RAG Ingestion Complete! Stored {len(stored_items)} chunks into Qdrant & Vector DB.")
 
     except Exception as e:
         RAG_JOBS[job_id]["status"] = "error"
         RAG_JOBS[job_id]["error"] = str(e)
-        RAG_JOBS[job_id]["logs"].append(f"❌ Ingestion Failed: {str(e)}")
+        RAG_JOBS[job_id]["logs"].append(f"[ERROR] Ingestion Failed: {str(e)}")
 
 def ingest_file_document(file_name: str, file_bytes: bytes, category: str) -> Dict[str, Any]:
     """Synchronous file ingestion wrapper."""

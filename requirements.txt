@@ -9,5 +9,6 @@ httpx
 openai
 qdrant-client
 pypdf
+pymupdf
 python-docx
 python-multipart
