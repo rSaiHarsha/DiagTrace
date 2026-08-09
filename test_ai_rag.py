@@ -51,5 +51,29 @@ class TestAIRAGSystem(unittest.TestCase):
         self.assertEqual(res["chart_spec"]["type"], "bar")
         print("[OK] Chatbot engine with dynamic Chart.js spec test passed.")
 
+    def test_05_chunk_deletion(self):
+        from backend.qdrant_service import delete_knowledge_chunk, get_knowledge_chunks
+        # Ingest a temporary test chunk
+        res = ingest_knowledge_document(
+            title="Delete Test Chunk",
+            category="Test Repository",
+            content="This chunk will be deleted by unit test."
+        )
+        chunk_id = res.get("id")
+        self.assertIsNotNone(chunk_id)
+        
+        # Verify chunk exists
+        chunks_before = get_knowledge_chunks(search="Delete Test Chunk")
+        self.assertTrue(any(c["id"] == chunk_id for c in chunks_before.get("chunks", [])))
+        
+        # Delete chunk
+        del_success = delete_knowledge_chunk(chunk_id)
+        self.assertTrue(del_success)
+        
+        # Verify chunk is gone
+        chunks_after = get_knowledge_chunks(search="Delete Test Chunk")
+        self.assertFalse(any(c["id"] == chunk_id for c in chunks_after.get("chunks", [])))
+        print(f"[OK] Chunk deletion test passed for chunk ID: {chunk_id}")
+
 if __name__ == "__main__":
     unittest.main()

@@ -20,7 +20,7 @@ from backend.rag_engine import (
     ingest_knowledge_document, ingest_file_document, 
     process_file_ingestion_background, get_rag_job_status
 )
-from backend.qdrant_service import get_all_knowledge_documents, set_qdrant_config
+from backend.qdrant_service import get_all_knowledge_documents, set_qdrant_config, get_knowledge_chunks, delete_knowledge_chunk
 from backend.rca_engine import run_ai_rca_analysis, get_weekly_ai_summary
 from backend.log_analysis_engine import run_log_analysis
 from backend.chatbot_engine import process_chatbot_query
@@ -358,6 +358,27 @@ def get_rag_job_status_endpoint(job_id: str):
     if not job_info:
         raise HTTPException(status_code=404, detail="Job ID not found.")
     return job_info
+
+
+@app.get("/api/rag/chunks")
+def rag_chunks_endpoint(category: Optional[str] = None, search: Optional[str] = None, page: int = 1, page_size: int = 20):
+    try:
+        data = get_knowledge_chunks(category, search, page, page_size)
+        return data
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to fetch chunks: {str(e)}")
+
+@app.delete("/api/rag/chunks/{chunk_id:path}")
+def delete_rag_chunk_endpoint(chunk_id: str):
+    try:
+        success = delete_knowledge_chunk(chunk_id)
+        if not success:
+            raise HTTPException(status_code=404, detail="Chunk not found or failed to delete")
+        return {"status": "success", "message": f"Chunk {chunk_id} deleted successfully"}
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to delete chunk: {str(e)}")
 
 @app.get("/api/rag/documents")
 def rag_documents_endpoint():

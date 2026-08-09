@@ -29,13 +29,13 @@
 </div>
 </header><div class="app-body-wrapper"><aside class="left-sidebar">
 <nav class="sidebar-nav">
-<a class="sidebar-link active" href="index.html" title="Logs">
+<a class="sidebar-link" href="index.html" title="Logs">
 <div class="sidebar-icon">
 <svg fill="none" height="20" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewbox="0 0 24 24" width="20"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" x2="8" y1="13" y2="13"></line><line x1="16" x2="8" y1="17" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
 </div>
 <span class="sidebar-text">Logs</span>
 </a>
-<a class="sidebar-link" href="knowledge_base.html" id="btn-sidebar-rag-nav" title="Knowledge Base">
+<a class="sidebar-link active" href="knowledge_base.html" id="btn-sidebar-rag-nav" title="Knowledge Base">
 <div class="sidebar-icon">
 <svg fill="none" height="20" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewbox="0 0 24 24" width="20"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path></svg>
 </div>
@@ -68,164 +68,167 @@
 </nav>
 </aside><main class="app-container">
 <!--  RESULTS SECTION (TABLE FIRST, THEN CHARTS) -->
-<section class="results-section" id="results-section"><div class="card grid-card">
-<div class="card-header">
-<div class="upload-status-group" style="display: flex; gap: 10px; align-items: center;">
-<button class="btn btn-small" id="btn-browse-folder" style="display: flex; align-items: center; gap: 6px;">
-<svg fill="none" height="14" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2.2" viewbox="0 0 24 24" width="14"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" x2="12" y1="3" y2="15"></line></svg> Upload Logs
-                        </button>
-<span class="spinner hidden" id="console-spinner">
-<span class="css-spinner"></span> Processing
+<!-- RAG KNOWLEDGE BASE MANAGER MODAL -->
+<section class="rag-section" id="rag-section">
+<div class="card grid-card">
+<div class="modal-header" style="border-bottom: none; flex-direction: column; align-items: flex-start; gap: 4px; padding: 20px 24px 15px 24px; position: relative;">
+
+<h3 style="font-size: 1.1rem; display: flex; align-items: center; gap: 8px;">
+<svg fill="none" height="18" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" style="color: var(--primary);" viewbox="0 0 24 24" width="18"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path></svg> RAG Knowledge Base Manager
+                </h3>
+<p style="font-size: 0.85rem; color: var(--text-secondary); margin: 0;">Upload technical manuals &amp; vector index context for AI diagnostics</p>
+</div>
+<div class="settings-tabs-header" style="padding: 0 24px; background: transparent; border-bottom: 1px solid var(--border-color);">
+<button class="settings-tab-btn active" id="rag-tab-file" onclick="switchRagTab('file')" style="display: flex; align-items: center; justify-content: center; gap: 8px;" type="button">
+<svg fill="none" height="14" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewbox="0 0 24 24" width="14"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="12" x2="12" y1="18" y2="12"></line><polyline points="9 15 12 12 15 15"></polyline></svg> File Upload (LLM Chunking)
+                </button>
+<button class="settings-tab-btn" id="rag-tab-manual" onclick="switchRagTab('manual')" style="display: flex; align-items: center; justify-content: center; gap: 8px;" type="button">
+<svg fill="none" height="14" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewbox="0 0 24 24" width="14"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg> Manual Text Input
+                </button>
+<button class="settings-tab-btn" id="rag-tab-chunks" onclick="switchRagTab('chunks')" style="display: flex; align-items: center; justify-content: center; gap: 8px;" type="button">
+<svg fill="none" height="14" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewbox="0 0 24 24" width="14"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path></svg> Stored Chunks
+                </button>
+</div>
+<div class="modal-body settings-modal-body" style="padding: 24px; max-height: calc(85vh - 140px); overflow-y: auto;">
+<!-- Live Progress Feed Section -->
+<div class="rag-progress-section hidden" id="rag-progress-section">
+<div class="progress-header-info">
+<span class="progress-status-text" id="rag-progress-status-text" style="display: flex; align-items: center; gap: 6px;">
+<svg fill="none" height="14" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" viewbox="0 0 24 24" width="14"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg> Ingesting document...
                         </span>
-<span><button class="btn btn-secondary btn-small" id="btn-toggle-logs" style="display: flex; align-items: center; gap: 6px;" title="Minimize/Maximize logs"><svg class="status-btn-icon" fill="none" height="14" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewbox="0 0 24 24" width="14"><line x1="5" x2="19" y1="12" y2="12"></line></svg> Status</button></span>
+<span class="progress-percentage" id="rag-progress-percentage">0%</span>
 </div>
-<div class="header-actions">
-<button class="btn btn-secondary btn-small" id="btn-clear-filters" style="display: flex; align-items: center; gap: 6px;" title="Clear all active column filters">
-<svg fill="none" height="14" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewbox="0 0 24 24" width="14"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"></polygon><line x1="18" x2="22" y1="18" y2="22"></line><line x1="22" x2="18" y1="18" y2="22"></line></svg> Clear Filters
-                        </button>
-<button class="btn btn-success btn-small" id="btn-export-excel" style="display: flex; align-items: center; gap: 6px;">
-<svg fill="none" height="14" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewbox="0 0 24 24" width="14"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" x2="8" y1="13" y2="13"></line><line x1="16" x2="8" y1="17" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg> Export to Excel
-                        </button>
+<div class="progress-bar-track">
+<div class="progress-bar-fill" id="rag-progress-bar-fill" style="width: 0%;"></div>
 </div>
-</div>
-<div class="log-console-container hidden" id="log-console-container">
-<div class="console-header">
-<span style="display: flex; align-items: center; gap: 8px;"><svg fill="none" height="14" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewbox="0 0 24 24" width="14"><polyline points="4 17 10 11 4 5"></polyline><line x1="12" x2="20" y1="19" y2="19"></line></svg> Live Diagnostic Engine Output Logs</span>
-<div class="console-header-actions">
-<span class="spinner hidden" id="console-spinner"><span class="css-spinner"></span>
-                                Processing</span>
-<button class="btn-icon" id="btn-toggle-logs" title="Minimize/Maximize logs">➖</button>
+<div class="live-logs-container">
+<ul class="live-log-list" id="rag-live-log-list">
+<!-- Live status items prepended dynamically -->
+</ul>
 </div>
 </div>
-<div class="console-body" id="log-console">
-<div class="log-line system-msg">[SYSTEM] Diagnostic parser initialized. Ready to receive
-                            directory
-                            instructions.</div>
-</div>
-</div>
-<!-- Data Table Container with Dynamic Column Header Filters -->
-<div class="table-container">
-<table class="data-table" id="registry-table">
-<thead>
-<tr class="table-headers" id="table-headers-row">
-<!-- Populated dynamically by app.js -->
-</tr>
-</thead>
-<tbody id="registry-table-body">
-<tr>
-<td class="no-data" colspan="10">No diagnostic logs parsed. Ingest directory path to
-                                    start.</td>
-</tr>
-</tbody>
-</table>
-</div>
-<!-- Grid Pagination Controls -->
-<div class="pagination-container">
-<div class="pagination-size">
-<label for="page-size-select">Rows per page:</label>
-<select class="mini-select" id="page-size-select">
-<option value="20">20</option>
-<option selected="" value="50">50</option>
-<option value="100">100</option>
-<option value="250">250</option>
-<option value="all">All</option>
+<!-- File Upload Tab View -->
+<div class="rag-tab-view" id="rag-view-file">
+<form class="auth-form" id="rag-file-form" style="padding-top: 0;">
+<div class="form-group" style="margin-bottom: 5px;">
+<label for="rag-file-category">Category</label>
+<select class="form-input" id="rag-file-category">
+<option value="Architectures">ECU Architecture Specs</option>
+<option value="Signal Information">Signal Information &amp; CAN Matrices</option>
+<option value="Test Reports">Test Reports &amp; Validation</option>
+<option value="Test Repository">Test Repository</option>
+<option value="Jira &amp; Requirements">Jira &amp; Requirements</option>
+<option value="Existing Issues">Existing Issues Repository</option>
 </select>
 </div>
-<div class="pagination-info" id="pagination-info-text">
-                        Showing 0-0 of 0 entries
-                    </div>
-<div class="pagination-nav">
-<button class="btn btn-icon" disabled="" id="btn-page-prev">◀</button>
-<span id="page-num-display">Page 1 of 1</span>
-<button class="btn btn-icon" disabled="" id="btn-page-next">▶</button>
+<div class="form-group">
+<label>Upload Document File (.pdf, .docx, .txt, .csv, .json, .md, .log)</label>
+<div class="file-dropzone" id="rag-dropzone">
+<div class="dropzone-icon" style="display: flex; justify-content: center; margin-bottom: 8px;">
+<svg fill="none" height="36" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" style="color: var(--primary);" viewbox="0 0 24 24" width="36"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" x2="12" y1="3" y2="15"></line></svg>
+</div>
+<div class="dropzone-text">Drag &amp; Drop document file here or <b>Browse</b></div>
+<div class="dropzone-hint">Supports PDF, DOCX, TXT, CSV, JSON, LOG, MD up to 25MB</div>
+<input accept=".pdf,.docx,.txt,.csv,.json,.log,.md" class="hidden-file-input" id="rag-file-input" type="file"/>
+</div>
+<div class="file-preview-badge hidden" id="rag-file-preview">
+<span style="display: flex; align-items: center; gap: 6px;"><svg fill="none" height="14" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewbox="0 0 24 24" width="14"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline></svg> <span id="rag-file-name">filename.pdf</span></span>
+<button class="btn-icon-remove" id="btn-remove-rag-file" type="button">×</button>
 </div>
 </div>
+<button class="btn btn-primary btn-full" id="btn-upload-rag-file" style="display: flex; justify-content: center; align-items: center; gap: 8px; font-size: 0.95rem; margin-top: 5px;" type="submit">
+<svg fill="none" height="15" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2.2" viewbox="0 0 24 24" width="15"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" x2="12" y1="3" y2="15"></line></svg> Parse, LLM Chunk &amp; Ingest to Vector DB
+                        </button>
+</form>
 </div>
-<!-- Global Diagnostic Registry Grid -->
-<!-- Executive KPI Cards -->
-<!-- Dashboard Charts -->
-<!-- Common Chart Dialog for all charts -->
-<div class="chart-dialog-overlay" id="chart-dialog-overlay">
-<div class="chart-dialog">
-<div class="chart-dialog-header">
-<h3 id="chart-dialog-title">Chart Preview</h3>
-<button class="close-dialog-btn" id="close-chart-dialog">×</button>
+<!-- Manual Text Tab View -->
+<div class="rag-tab-view hidden" id="rag-view-manual">
+<form class="auth-form" id="rag-ingest-form" style="padding-top: 0;">
+<div class="form-group" style="margin-bottom: 5px;">
+<label for="rag-title">Document Title</label>
+<input class="form-input" id="rag-title" placeholder="e.g. ECM Architecture v3.2 Spec" type="text"/>
 </div>
-<div class="dialog-chart-wrapper">
-<canvas id="chart-dialog-canvas"></canvas>
+<div class="form-group" style="margin-bottom: 5px;">
+<label for="rag-category">Category</label>
+<select class="form-input" id="rag-category">
+<option value="Architectures">ECU Architecture</option>
+<option value="Signal Information">Signal Information &amp; CAN</option>
+<option value="Test Reports">Test Reports</option>
+<option value="Test Repository">Test Repository</option>
+<option value="Jira &amp; Requirements">Jira &amp; Requirements</option>
+<option value="Existing Issues">Existing Issues Repository</option>
+</select>
+</div>
+<div class="form-group" style="margin-bottom: 15px;">
+<label for="rag-content">Document Content / Text</label>
+<textarea class="form-input" id="rag-content" placeholder="Paste requirements, signal info, or test findings..." rows="4"></textarea>
+</div>
+<button class="btn btn-primary btn-full" style="display: flex; justify-content: center; align-items: center; gap: 8px; font-size: 0.95rem;" type="submit">
+<svg fill="none" height="15" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewbox="0 0 24 24" width="15"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path><polyline points="17 21 17 13 7 13 7 21"></polyline><polyline points="7 3 7 8 15 8"></polyline></svg> Index into Qdrant Vector DB
+                        </button>
+</form>
+</div>
+<div class="rag-docs-list-section" style="margin-top: 20px; border-top: 1px solid var(--border-color); padding-top: 15px;">
+<h4 style="font-size: 0.95rem; font-weight: 600; margin-bottom: 10px; color: var(--text-primary);">Indexed Knowledge Records</h4>
+<div class="rag-docs-container" id="rag-docs-container">
+<!-- Indexed documents loaded dynamically -->
+</div>
+
+<!-- Stored Chunks Tab View -->
+<div class="rag-tab-view hidden" id="rag-view-chunks">
+    <div style="display: flex; gap: 15px; margin-bottom: 15px; align-items: flex-end;">
+        <div class="form-group" style="flex: 1; margin-bottom: 0;">
+            <label for="rag-chunk-category-filter">Filter by Category</label>
+            <select class="form-input" id="rag-chunk-category-filter">
+                <option value="All">All Categories</option>
+                <option value="Architectures">ECU Architecture Specs</option>
+                <option value="Signal Information">Signal Information &amp; CAN Matrices</option>
+                <option value="Test Reports">Test Reports &amp; Validation</option>
+                <option value="Test Repository">Test Repository</option>
+                <option value="Jira &amp; Requirements">Jira &amp; Requirements</option>
+                <option value="Existing Issues">Existing Issues Repository</option>
+            </select>
+        </div>
+        <div class="form-group" style="flex: 2; margin-bottom: 0;">
+            <label for="rag-chunk-search">Search Chunks</label>
+            <div style="display: flex; gap: 10px;">
+                <input class="form-input" id="rag-chunk-search" placeholder="Search title or content..." type="text"/>
+            </div>
+        </div>
+    </div>
+    
+    <div class="rag-docs-list-section" style="margin-top: 15px; border-top: 1px solid var(--border-color); padding-top: 15px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+            <h4 style="font-size: 0.95rem; font-weight: 600; color: var(--text-primary);">Document Chunks</h4>
+            <div id="rag-chunk-count" style="font-size: 0.85rem; color: var(--text-secondary);">Showing 0 items</div>
+        </div>
+        
+        <div id="rag-chunks-container" style="display: flex; flex-direction: column; gap: 10px; max-height: 50vh; overflow-y: auto; padding-right: 5px;">
+            <!-- Chunk cards will be injected here -->
+        </div>
+        
+        <!-- Pagination Controls -->
+        <div class="pagination-container" style="margin-top: 15px; border-top: none; padding-top: 0; justify-content: space-between;">
+            <div class="pagination-size">
+                <label for="rag-chunk-page-size">Rows per page:</label>
+                <select class="mini-select" id="rag-chunk-page-size">
+                    <option value="10">10</option>
+                    <option selected="" value="20">20</option>
+                    <option value="50">50</option>
+                </select>
+            </div>
+            <div class="pagination-nav">
+                <button class="btn btn-icon" disabled id="btn-rag-chunk-prev">◀</button>
+                <span id="rag-chunk-page-num">Page 1 of 1</span>
+                <button class="btn btn-icon" disabled id="btn-rag-chunk-next">▶</button>
+            </div>
+        </div>
+    </div>
+</div>
+
 </div>
 </div>
-</div>
-<div class="kpi-grid">
-<div class="kpi-card">
-<div class="kpi-info">
-<span class="kpi-title">Total DTC Records</span>
-<h3 id="kpi-total-records">0</h3>
-</div>
-<div class="kpi-icon blue">📄</div>
-</div>
-<div class="kpi-card">
-<div class="kpi-info">
-<span class="kpi-title">Unique DTCs</span>
-<h3 id="kpi-unique-dtcs">0</h3>
-</div>
-<div class="kpi-icon teal">⚠️</div>
-</div>
-<div class="kpi-card">
-<div class="kpi-info">
-<span class="kpi-title">Active Program modules</span>
-<h3 id="kpi-active-programs">0</h3>
-</div>
-<div class="kpi-icon purple">🚗</div>
-</div>
-<div class="kpi-card">
-<div class="kpi-info">
-<span class="kpi-title">Open Issue Statuses</span>
-<h3 id="kpi-open-issues">0</h3>
-</div>
-<div class="kpi-icon red">🚨</div>
-</div>
-<div class="kpi-card">
-<div class="kpi-info">
-<span class="kpi-title">Active Modules</span>
-<h3 id="kpi-active-modules">0</h3>
-</div>
-<div class="kpi-icon orange">🧩</div>
-</div>
-</div><div class="charts-section">
-<div class="charts-grid-header">
-<h2>📊 Summary Dashboard</h2>
-</div>
-<div class="charts-row">
-<div class="chart-card" data-chart-id="chart-top-dtc" data-dialog-title="Top 20 DTCs by Count" id="top-dtc-card">
-<h3>Top 20 DTCs by Count</h3>
-<div class="chart-wrapper">
-<canvas id="chart-top-dtc"></canvas>
-</div>
-</div>
-<div class="chart-card" data-chart-id="chart-top-modules" data-dialog-title="Top Modules by DTC Count" id="top-modules-card">
-<h3>Top Modules by DTC Count</h3>
-<div class="chart-wrapper">
-<canvas id="chart-top-modules"></canvas>
-</div>
-</div>
-</div>
-<div class="charts-row">
-<div class="chart-card" data-chart-id="chart-status-modules" data-dialog-title="Module DTC Counts by Issue Status" id="status-modules-card">
-<h3>Module DTC Counts by Issue Status</h3>
-<div class="chart-wrapper">
-<canvas id="chart-status-modules"></canvas>
-</div>
-</div>
-<div class="chart-card" data-chart-id="chart-program-distribution" data-dialog-title="DTC Distribution by Program Name" id="program-distribution-card">
-<h3>DTC Distribution by Program Name</h3>
-<div class="chart-wrapper">
-<canvas id="chart-program-distribution"></canvas>
-</div>
-</div>
-</div>
-</div></section>
-<!-- RAG KNOWLEDGE BASE MANAGER MODAL -->
+</section>
 
 </main></div>
 <!-- MODAL FOR DIRECTORY BROWSER WITH SERVER/LOCAL TABS -->
@@ -681,7 +684,29 @@
             </li>
 </ul>
 </div>
+
+<!-- CHUNK VIEWER MODAL -->
+<div class="modal hidden" id="chunk-viewer-modal">
+    <div class="modal-content auth-modal-content" style="max-width: 700px; padding-bottom: 20px;">
+        <div class="modal-header" style="border-bottom: 1px solid var(--border-color); padding: 15px 24px; position: relative;">
+            <h3 id="chunk-viewer-title" style="margin: 0; font-size: 1.1rem; color: var(--primary);">Chunk Details</h3>
+            <span class="modal-close" id="chunk-viewer-close" style="position: absolute; right: 20px; top: 15px;">x</span>
+        </div>
+        <div class="modal-body" style="padding: 24px; max-height: 60vh; overflow-y: auto;">
+            <div id="chunk-viewer-meta" style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 15px; display: flex; justify-content: space-between; align-items: center;"></div>
+            <div id="chunk-viewer-content" style="font-size: 0.95rem; line-height: 1.6; white-space: pre-wrap; word-break: break-word; color: var(--text-primary); background: var(--bg-primary); padding: 15px; border-radius: 6px; border: 1px solid var(--border-color);"></div>
+            <div style="margin-top: 15px; display: flex; justify-content: flex-end;">
+                <button id="btn-delete-modal-chunk" class="btn-primary" style="background-color: #ef4444; border-color: #ef4444; color: white; display: flex; align-items: center; gap: 6px;" type="button">
+                    <svg fill="none" height="14" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewbox="0 0 24 24" width="14"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+                    Delete Chunk
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
 <!-- Custom Frontend App Javascript -->
 <script src="app.js?v=2.1.0"></script>
+<script src="knowledge_base.js?v=2.1.0"></script>
 </body>
 </html>

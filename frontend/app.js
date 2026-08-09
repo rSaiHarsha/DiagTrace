@@ -39,6 +39,8 @@ const elements = {
     btnToggleLogs: document.getElementById('btn-toggle-logs'),
     
     resultsSection: document.getElementById('results-section'),
+    ragSection: document.getElementById('rag-section'),
+    btnOpenLogs: document.getElementById('btn-sidebar-logs-nav'),
     
     // KPIs
     kpiTotalRecords: document.getElementById('kpi-total-records'),
@@ -129,10 +131,21 @@ const elements = {
     rcaLoading: document.getElementById('rca-loading'),
     rcaReportBody: document.getElementById('rca-report-body'),
     
-    ragModal: document.getElementById('rag-modal'),
+    ragModal: document.getElementById('rag-section'), // kept as ragModal for compatibility
     ragClose: document.getElementById('rag-close'),
     ragTabFile: document.getElementById('rag-tab-file'),
     ragTabManual: document.getElementById('rag-tab-manual'),
+    ragTabChunks: document.getElementById('rag-tab-chunks'),
+    ragViewChunks: document.getElementById('rag-view-chunks'),
+    ragChunkCategoryFilter: document.getElementById('rag-chunk-category-filter'),
+    ragChunkSearch: document.getElementById('rag-chunk-search'),
+    ragChunksContainer: document.getElementById('rag-chunks-container'),
+    ragChunkCount: document.getElementById('rag-chunk-count'),
+    ragChunkPageSize: document.getElementById('rag-chunk-page-size'),
+    btnRagChunkPrev: document.getElementById('btn-rag-chunk-prev'),
+    btnRagChunkNext: document.getElementById('btn-rag-chunk-next'),
+    ragChunkPageNum: document.getElementById('rag-chunk-page-num'),
+
     ragViewFile: document.getElementById('rag-view-file'),
     ragViewManual: document.getElementById('rag-view-manual'),
     ragFileForm: document.getElementById('rag-file-form'),
@@ -270,49 +283,7 @@ function setupEventListeners() {
     if (elements.btnMaximizeDockedRca) elements.btnMaximizeDockedRca.addEventListener('click', maximizeRcaDock);
     if (elements.btnCloseDockedRca) elements.btnCloseDockedRca.addEventListener('click', closeRcaDock);
     if (elements.dockedRcaBody) elements.dockedRcaBody.addEventListener('click', maximizeRcaDock);
-    if (elements.btnOpenRag) elements.btnOpenRag.addEventListener('click', openRagModal);
     if (elements.rcaClose) elements.rcaClose.addEventListener('click', closeRcaModal);
-    if (elements.ragClose) elements.ragClose.addEventListener('click', closeRagModal);
-    if (elements.btnDockRag) elements.btnDockRag.addEventListener('click', dockRagModal);
-    if (elements.btnMaximizeDockedRag) elements.btnMaximizeDockedRag.addEventListener('click', maximizeRagDock);
-    if (elements.btnCloseDockedRag) elements.btnCloseDockedRag.addEventListener('click', closeRagDock);
-    if (elements.ragTabFile) elements.ragTabFile.addEventListener('click', () => switchRagTab('file'));
-    if (elements.ragTabManual) elements.ragTabManual.addEventListener('click', () => switchRagTab('manual'));
-    
-    if (elements.ragDropzone) {
-        elements.ragDropzone.addEventListener('click', () => {
-            if (elements.ragFileInput) elements.ragFileInput.click();
-        });
-        elements.ragDropzone.addEventListener('dragover', (e) => {
-            e.preventDefault();
-            elements.ragDropzone.classList.add('drag-over');
-        });
-        elements.ragDropzone.addEventListener('dragleave', () => {
-            elements.ragDropzone.classList.remove('drag-over');
-        });
-        elements.ragDropzone.addEventListener('drop', (e) => {
-            e.preventDefault();
-            elements.ragDropzone.classList.remove('drag-over');
-            if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
-                handleSelectedRagFile(e.dataTransfer.files[0]);
-            }
-        });
-    }
-    if (elements.ragFileInput) {
-        elements.ragFileInput.addEventListener('change', (e) => {
-            if (e.target.files && e.target.files.length > 0) {
-                handleSelectedRagFile(e.target.files[0]);
-            }
-        });
-    }
-    if (elements.btnRemoveRagFile) {
-        elements.btnRemoveRagFile.addEventListener('click', (e) => {
-            e.stopPropagation();
-            clearSelectedRagFile();
-        });
-    }
-    if (elements.ragFileForm) elements.ragFileForm.addEventListener('submit', handleRagFileUpload);
-    if (elements.ragIngestForm) elements.ragIngestForm.addEventListener('submit', handleRagIngest);
     
     // AI Chatbot Widget Controls
     if (elements.chatWidgetToggle) elements.chatWidgetToggle.addEventListener('click', toggleChatDrawer);
@@ -391,76 +362,88 @@ function setupEventListeners() {
     if (elements.signupForm) elements.signupForm.addEventListener('submit', handleSignUp);
 
     // Ingestion controls
-    elements.folderPickerClient.addEventListener('change', handleClientFolderSelected);
-    elements.btnToggleLogs.addEventListener('click', toggleLogsMinimization);
+    if (elements.folderPickerClient) elements.folderPickerClient.addEventListener('change', handleClientFolderSelected);
+    if (elements.btnToggleLogs) elements.btnToggleLogs.addEventListener('click', toggleLogsMinimization);
     
     // Clear Filters Action
-    elements.btnClearFilters.addEventListener('click', clearAllFilters);
-    elements.explorerCurrentPath.addEventListener('click', () => {
-        const path = elements.explorerCurrentPath.value;
-        if(path ){
-            fetchDirectoryContents(path);
-        }
-    });
-    elements.btnToggleLogs.addEventListener('click', toggleLogsMinimization);
-    elements.btnToggleLogs.classList.add('hidden');
+    if (elements.btnClearFilters) elements.btnClearFilters.addEventListener('click', clearAllFilters);
+    if (elements.explorerCurrentPath) {
+        elements.explorerCurrentPath.addEventListener('click', () => {
+            const path = elements.explorerCurrentPath.value;
+            if (path) {
+                fetchDirectoryContents(path);
+            }
+        });
+    }
+    if (elements.btnToggleLogs) {
+        elements.btnToggleLogs.addEventListener('click', toggleLogsMinimization);
+        elements.btnToggleLogs.classList.add('hidden');
+    }
     
     // Event delegation for dynamic header column filters
-    elements.tableHeadersRow.addEventListener('change', (e) => {
-        if (e.target.classList.contains('header-filter-select') || e.target.classList.contains('custom-dropdown')) {
-            handleFilterChange();
-        }
-    });
-    elements.tableHeadersRow.addEventListener('input', debounce((e) => {
-        if (e.target.classList.contains('header-filter-input')) {
-            handleFilterChange();
-        }
-    }, 250));
+    if (elements.tableHeadersRow) {
+        elements.tableHeadersRow.addEventListener('change', (e) => {
+            if (e.target.classList.contains('header-filter-select') || e.target.classList.contains('custom-dropdown')) {
+                handleFilterChange();
+            }
+        });
+        elements.tableHeadersRow.addEventListener('input', debounce((e) => {
+            if (e.target.classList.contains('header-filter-input')) {
+                handleFilterChange();
+            }
+        }, 250));
+    }
     
     // Pagination & Page Size
-    elements.pageSizeSelect.addEventListener('change', (e) => {
-        appState.pageSize = e.target.value === 'all' ? 'all' : parseInt(e.target.value);
-        appState.currentPage = 1;
-        renderGridAndPagination();
-    });
-    elements.btnPagePrev.addEventListener('click', () => {
-        if (appState.currentPage > 1) {
-            appState.currentPage--;
+    if (elements.pageSizeSelect) {
+        elements.pageSizeSelect.addEventListener('change', (e) => {
+            appState.pageSize = e.target.value === 'all' ? 'all' : parseInt(e.target.value);
+            appState.currentPage = 1;
             renderGridAndPagination();
-        }
-    });
-    elements.btnPageNext.addEventListener('click', () => {
-        const totalPages = getTotalPages();
-        if (appState.currentPage < totalPages) {
-            appState.currentPage++;
-            renderGridAndPagination();
-        }
-    });
+        });
+    }
+    if (elements.btnPagePrev) {
+        elements.btnPagePrev.addEventListener('click', () => {
+            if (appState.currentPage > 1) {
+                appState.currentPage--;
+                renderGridAndPagination();
+            }
+        });
+    }
+    if (elements.btnPageNext) {
+        elements.btnPageNext.addEventListener('click', () => {
+            const totalPages = getTotalPages();
+            if (appState.currentPage < totalPages) {
+                appState.currentPage++;
+                renderGridAndPagination();
+            }
+        });
+    }
     
     // Export to Excel
-    elements.btnExportExcel.addEventListener('click', exportToExcel);
+    if (elements.btnExportExcel) elements.btnExportExcel.addEventListener('click', exportToExcel);
     
     // Modal Dialog Show / Hide triggers
-    elements.btnBrowseFolder.addEventListener('click', openExplorerModal);
-    elements.explorerClose.addEventListener('click', closeExplorerModal);
-    elements.explorerBtnCancel.addEventListener('click', closeExplorerModal);
-    elements.explorerBtnSelect.addEventListener('click', selectExplorerFolder);
+    if (elements.btnBrowseFolder) elements.btnBrowseFolder.addEventListener('click', openExplorerModal);
+    if (elements.explorerClose) elements.explorerClose.addEventListener('click', closeExplorerModal);
+    if (elements.explorerBtnCancel) elements.explorerBtnCancel.addEventListener('click', closeExplorerModal);
+    if (elements.explorerBtnSelect) elements.explorerBtnSelect.addEventListener('click', selectExplorerFolder);
     
     // Dialog Navigation Tab Selectors
-    elements.tabServer.addEventListener('click', () => toggleModalTab('server'));
-    elements.tabClient.addEventListener('click', () => toggleModalTab('client'));
+    if (elements.tabServer) elements.tabServer.addEventListener('click', () => toggleModalTab('server'));
+    if (elements.tabClient) elements.tabClient.addEventListener('click', () => toggleModalTab('client'));
     
     // Server Directory navigation click triggers
-    elements.explorerNavUp.addEventListener('click', explorerNavigateUp);
-    elements.explorerNavHome.addEventListener('click', () => fetchDirectoryContents(""));
-    elements.explorerShortcutWorkspace.addEventListener('click', () => fetchDirectoryContents(""));
-    elements.explorerShortcutRoot.addEventListener('click', () => fetchDirectoryContents("C:\\"));
-    elements.explorerShortcutUser.addEventListener('click', () => fetchDirectoryContents("USER_HOME"));
+    if (elements.explorerNavUp) elements.explorerNavUp.addEventListener('click', explorerNavigateUp);
+    if (elements.explorerNavHome) elements.explorerNavHome.addEventListener('click', () => fetchDirectoryContents(""));
+    if (elements.explorerShortcutWorkspace) elements.explorerShortcutWorkspace.addEventListener('click', () => fetchDirectoryContents(""));
+    if (elements.explorerShortcutRoot) elements.explorerShortcutRoot.addEventListener('click', () => fetchDirectoryContents("C:\\"));
+    if (elements.explorerShortcutUser) elements.explorerShortcutUser.addEventListener('click', () => fetchDirectoryContents("USER_HOME"));
 
     // Click triggers for Client Drag/Drop
     if (elements.uploadDropzone) {
         elements.uploadDropzone.addEventListener('click', () => {
-            elements.folderPickerClient.click();
+            if (elements.folderPickerClient) elements.folderPickerClient.click();
         });
         
         ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
@@ -1132,19 +1115,20 @@ function loadRegistryData() {
             });
             
             if (appState.allData.length > 0) {
-                elements.resultsSection.classList.remove('hidden');
+                if (elements.resultsSection) elements.resultsSection.classList.remove('hidden');
                 
                 // Identify and initialize dynamic columns
                 buildDynamicColumns();
                 buildHeaderFiltersMarkup();
                 applyFilters();
             } else {
-                // elements.resultsSection.classList.add('hidden');
-                elements.registryTableBody.innerHTML =`
-                <tr> 
-                    <td colspan ="10" class = "no-data-msg">No Data Available</td>
-                </tr>
-                `
+                if (elements.registryTableBody) {
+                    elements.registryTableBody.innerHTML = `
+                    <tr> 
+                        <td colspan="10" class="no-data-msg">No Data Available</td>
+                    </tr>
+                    `;
+                }
             }
         })
         .catch(err => logErrorToConsole("Load Diagnostics Data", err));
@@ -1154,17 +1138,18 @@ function startAnalysis() {
     const folderPath = (appState.selectedFolderPath || " ").trim();
     if (!folderPath) return;
     
-    elements.logConsoleContainer.classList.remove('hidden');
-    elements.logConsoleContainer.classList.remove('minimized');
+    if (elements.logConsoleContainer) {
+        elements.logConsoleContainer.classList.remove('hidden');
+        elements.logConsoleContainer.classList.remove('minimized');
+    }
    
-
-    elements.btnBrowseFolder.classList.add("hidden");
-    elements.consoleSpinner.classList.remove("hidden");
-    elements.btnToggleLogs.classList.remove("hidden");
-     elements.btnToggleLogs.innerText = "➖ Status";
-    elements.logConsole.innerHTML = `<div class="log-line system-msg">[SYSTEM] Connecting to backend engine for parsing '${folderPath}'...</div>`;
-    elements.consoleSpinner.classList.remove('hidden');
-    //elements.btnRunAnalysis.disabled = true;
+    if (elements.btnBrowseFolder) elements.btnBrowseFolder.classList.add("hidden");
+    if (elements.consoleSpinner) elements.consoleSpinner.classList.remove("hidden");
+    if (elements.btnToggleLogs) {
+        elements.btnToggleLogs.classList.remove("hidden");
+        elements.btnToggleLogs.innerText = "➖ Status";
+    }
+    if (elements.logConsole) elements.logConsole.innerHTML = `<div class="log-line system-msg">[SYSTEM] Connecting to backend engine for parsing '${folderPath}'...</div>`;
     
     fetch('/api/start-parse', {
         method: 'POST',
@@ -1183,17 +1168,15 @@ function startAnalysis() {
         if (data.status === 'started' || data.status === 'already_processing') {
             startPollingLogs();
         } else {
-            elements.consoleSpinner.classList.add('hidden');
-            
+            if (elements.consoleSpinner) elements.consoleSpinner.classList.add('hidden');
             appendLogLine({ message: "Failed to initiate parsing engine.", level: "error", time: "" });
         }
     })
     .catch(err => {
-        elements.consoleSpinner.classList.add('hidden');
-        elements.btnRunAnalysis.disabled = false;
+        if (elements.consoleSpinner) elements.consoleSpinner.classList.add('hidden');
+        if (elements.btnRunAnalysis) elements.btnRunAnalysis.disabled = false;
         logErrorToConsole("Start Analysis Engine", err);
-        elements.consoleSpinner.classList.add("hidden");
-        elements.btnBrowseFolder.classList.remove("hidden");
+        if (elements.btnBrowseFolder) elements.btnBrowseFolder.classList.remove("hidden");
     });
 }
 
@@ -1217,9 +1200,8 @@ function startPollingLogs() {
                 if (!status.is_processing) {
                     clearInterval(appState.pollIntervalId);
                     appState.isPolling = false;
-                    elements.consoleSpinner.classList.add('hidden');
-                    elements.consoleSpinner.classList.add('hidden');
-                    elements.btnBrowseFolder.classList.remove('hidden');
+                    if (elements.consoleSpinner) elements.consoleSpinner.classList.add('hidden');
+                    if (elements.btnBrowseFolder) elements.btnBrowseFolder.classList.remove('hidden');
                     
                     if (status.error_message) {
                         showToast(`Analysis error: ${status.error_message}`, "error");
@@ -1234,21 +1216,21 @@ function startPollingLogs() {
                 logErrorToConsole("Poll Logs Progress", err);
                 clearInterval(appState.pollIntervalId);
                 appState.isPolling = false;
-                elements.consoleSpinner.classList.add('hidden');
-              //  elements.btnRunAnalysis.disabled = false;
+                if (elements.consoleSpinner) elements.consoleSpinner.classList.add('hidden');
             });
     }, 800);
 }
 
 function updateLogConsole(logs) {
     if (!logs || logs.length === 0) return;
-    elements.logConsole.innerHTML = "";
+    if (elements.logConsole) elements.logConsole.innerHTML = "";
     logs.forEach(log => {
         appendLogLine(log);
     });
 }
 
 function appendLogLine(log) {
+    if (!elements.logConsole) return;
     const div = document.createElement('div');
     div.className = `log-line ${log.level || 'info'}`;
     const timeStr = log.time ? `[${log.time}] ` : '';
@@ -1273,11 +1255,11 @@ function resetParserEngine() {
                     clearInterval(appState.pollIntervalId);
                     appState.isPolling = false;
                 }
-                elements.logConsoleContainer.classList.add('hidden');
-                elements.consoleSpinner.classList.add('hidden');
-                elements.logConsole.innerHTML = "";
-                elements.folderPathInput.value = "";
-                elements.btnRunAnalysis.disabled = true;
+                if (elements.logConsoleContainer) elements.logConsoleContainer.classList.add('hidden');
+                if (elements.consoleSpinner) elements.consoleSpinner.classList.add('hidden');
+                if (elements.logConsole) elements.logConsole.innerHTML = "";
+                if (elements.folderPathInput) elements.folderPathInput.value = "";
+                if (elements.btnRunAnalysis) elements.btnRunAnalysis.disabled = true;
                 appState.selectedFolderPath = "";
                 
                 elements.selectedClientFilesCount.innerText = "No local folder selected.";
@@ -1340,6 +1322,7 @@ function getUniqueValuesCount(colName) {
 }
 
 function buildHeaderFiltersMarkup() {
+    if (!elements.tableHeadersRow) return;
     elements.tableHeadersRow.innerHTML = "";
     
     appState.columns.forEach(col => {
@@ -1594,13 +1577,13 @@ function updateKPIs() {
         return val === 'open' || val === 'new';
     }).length;
     
-    elements.kpiTotalRecords.innerText = total.toLocaleString();
-    elements.kpiUniqueDtcs.innerText = uniqueDtcs.toString();
-    elements.kpiActivePrograms.innerText = activeProgs.toString();
+    if (elements.kpiTotalRecords) elements.kpiTotalRecords.innerText = total.toLocaleString();
+    if (elements.kpiUniqueDtcs) elements.kpiUniqueDtcs.innerText = uniqueDtcs.toString();
+    if (elements.kpiActivePrograms) elements.kpiActivePrograms.innerText = activeProgs.toString();
     if (elements.kpiActiveModules) {
         elements.kpiActiveModules.innerText = activeModules.toString();
     }
-    elements.kpiOpenIssues.innerText = openIssues.toString();
+    if (elements.kpiOpenIssues) elements.kpiOpenIssues.innerText = openIssues.toString();
 }
 
 function getTotalPages() {
@@ -1609,19 +1592,22 @@ function getTotalPages() {
 }
 
 function renderGridAndPagination() {
+    if (!elements.registryTableBody) return;
     const total = appState.filteredData.length;
     elements.registryTableBody.innerHTML = "";
     
     if (total === 0) {
-        elements.registryTableBody.innerHTML = `
-            <tr>
-                <td colspan="${appState.columns.length || 10}" class="no-data">No diagnostic records found matching current filters.</td>
-            </tr>
-        `;
-        elements.btnPagePrev.disabled = true;
-        elements.btnPageNext.disabled = true;
-        elements.pageNumDisplay.innerText = "Page 1 of 1";
-        elements.paginationInfoText.innerText = "Showing 0-0 of 0 entries";
+        if (elements.registryTableBody) {
+            elements.registryTableBody.innerHTML = `
+                <tr>
+                    <td colspan="${appState.columns.length || 10}" class="no-data">No diagnostic records found matching current filters.</td>
+                </tr>
+            `;
+        }
+        if (elements.btnPagePrev) elements.btnPagePrev.disabled = true;
+        if (elements.btnPageNext) elements.btnPageNext.disabled = true;
+        if (elements.pageNumDisplay) elements.pageNumDisplay.innerText = "Page 1 of 1";
+        if (elements.paginationInfoText) elements.paginationInfoText.innerText = "Showing 0-0 of 0 entries";
         return;
     }
     
@@ -1636,16 +1622,16 @@ function renderGridAndPagination() {
         startIdx = (appState.currentPage - 1) * appState.pageSize;
         endIdx = Math.min(total, startIdx + appState.pageSize);
         
-        elements.btnPagePrev.disabled = appState.currentPage === 1;
-        elements.btnPageNext.disabled = appState.currentPage === totalPages;
-        elements.pageNumDisplay.innerText = `Page ${appState.currentPage} of ${totalPages}`;
+        if (elements.btnPagePrev) elements.btnPagePrev.disabled = appState.currentPage === 1;
+        if (elements.btnPageNext) elements.btnPageNext.disabled = appState.currentPage === totalPages;
+        if (elements.pageNumDisplay) elements.pageNumDisplay.innerText = `Page ${appState.currentPage} of ${totalPages}`;
     } else {
-        elements.btnPagePrev.disabled = true;
-        elements.btnPageNext.disabled = true;
-        elements.pageNumDisplay.innerText = "Page 1 of 1";
+        if (elements.btnPagePrev) elements.btnPagePrev.disabled = true;
+        if (elements.btnPageNext) elements.btnPageNext.disabled = true;
+        if (elements.pageNumDisplay) elements.pageNumDisplay.innerText = "Page 1 of 1";
     }
     
-    elements.paginationInfoText.innerHTML = `Showing <b>${startIdx + 1}</b>-<b>${endIdx}</b> of <b>${total.toLocaleString()}</b> entries`;
+    if (elements.paginationInfoText) elements.paginationInfoText.innerHTML = `Showing <b>${startIdx + 1}</b>-<b>${endIdx}</b> of <b>${total.toLocaleString()}</b> entries`;
     
     const pageData = appState.filteredData.slice(startIdx, endIdx);
     const statusOptions = ['New', 'Known', 'Not an Issue', 'Fixed', 'Needs Investigation'];
@@ -1917,6 +1903,7 @@ function saveRowUpdate(rowIndex, updatePayload) {
 // Adaptive Dashboard Visualizations (Respects System Colors)
 // ----------------------------------------------------
 function renderCharts() {
+    if (!document.getElementById('chart-top-dtc')) return;
     const data = appState.filteredData;
     if (data.length === 0) return;
     
@@ -2135,6 +2122,7 @@ function exportToExcel() {
 }
 
 function showToast(message, type = "success") {
+    if (!elements.toast || !elements.toastMessage) return;
     elements.toastMessage.innerText = message;
     const iconEl = elements.toast.querySelector('.toast-icon');
     
@@ -2154,7 +2142,7 @@ function showToast(message, type = "success") {
     
     elements.toast.classList.remove('hidden');
     setTimeout(() => {
-        elements.toast.classList.add('hidden');
+        if (elements.toast) elements.toast.classList.add('hidden');
     }, 3000);
 }
 
@@ -2201,8 +2189,10 @@ function setupErrorLogging() {
 
 function logErrorToConsole(errContext, err) {
     console.error(`${errContext}:`, err);
-    elements.logConsoleContainer.classList.remove('hidden');
-    elements.logConsoleContainer.classList.remove('minimized');
+    if (elements.logConsoleContainer) {
+        elements.logConsoleContainer.classList.remove('hidden');
+        elements.logConsoleContainer.classList.remove('minimized');
+    }
     
     const message = err && err.message ? err.message : String(err);
     appendLogLine({
@@ -2378,234 +2368,6 @@ function closeRcaModal() {
     stopRcaAnalysis();
 }
 
-function openRagModal() {
-    if (elements.ragModal) elements.ragModal.classList.remove('hidden');
-    fetchRagDocuments();
-}
-
-function closeRagModal() {
-    if (elements.ragModal) elements.ragModal.classList.add('hidden');
-}
-
-function fetchRagDocuments() {
-    if (!elements.ragDocsContainer) return;
-    fetch('/api/rag/documents')
-    .then(res => res.json())
-    .then(data => {
-        if (data.documents && data.documents.length > 0) {
-            elements.ragDocsContainer.innerHTML = data.documents.map(doc => `
-                <div class="rag-doc-item">
-                    <div>
-                        <b>${escapeHtml(doc.title)}</b>
-                        <div class="text-muted" style="font-size:0.78rem;">Indexed: ${doc.created_at}</div>
-                    </div>
-                    <span class="rag-doc-badge">${escapeHtml(doc.category)}</span>
-                </div>
-            `).join('');
-        } else {
-            elements.ragDocsContainer.innerHTML = '<p class="text-muted">No custom knowledge items indexed yet.</p>';
-        }
-    })
-    .catch(() => {
-        elements.ragDocsContainer.innerHTML = '<p class="text-muted">Failed to load documents.</p>';
-    });
-}
-
-let selectedRagFile = null;
-
-function switchRagTab(tabName) {
-    if (tabName === 'file') {
-        if (elements.ragTabFile) elements.ragTabFile.classList.add('active');
-        if (elements.ragTabManual) elements.ragTabManual.classList.remove('active');
-        if (elements.ragViewFile) elements.ragViewFile.classList.remove('hidden');
-        if (elements.ragViewManual) elements.ragViewManual.classList.add('hidden');
-    } else {
-        if (elements.ragTabFile) elements.ragTabFile.classList.remove('active');
-        if (elements.ragTabManual) elements.ragTabManual.classList.add('active');
-        if (elements.ragViewFile) elements.ragViewFile.classList.add('hidden');
-        if (elements.ragViewManual) elements.ragViewManual.classList.remove('hidden');
-    }
-}
-
-function handleSelectedRagFile(file) {
-    if (!file) return;
-    selectedRagFile = file;
-    if (elements.ragFileName) elements.ragFileName.innerText = `${file.name} (${(file.size / 1024).toFixed(1)} KB)`;
-    if (elements.ragFilePreview) elements.ragFilePreview.classList.remove('hidden');
-}
-
-function clearSelectedRagFile() {
-    selectedRagFile = null;
-    if (elements.ragFileInput) elements.ragFileInput.value = '';
-    if (elements.ragFilePreview) elements.ragFilePreview.classList.add('hidden');
-    if (elements.ragFileName) elements.ragFileName.innerText = '';
-}
-
-let activeRagJobId = null;
-let activeRagJobInterval = null;
-
-function dockRagModal() {
-    if (elements.ragModal) elements.ragModal.classList.add('hidden');
-    if (elements.dockedRagWidget) elements.dockedRagWidget.classList.remove('hidden');
-}
-
-function maximizeRagDock() {
-    if (elements.dockedRagWidget) elements.dockedRagWidget.classList.add('hidden');
-    if (elements.ragModal) elements.ragModal.classList.remove('hidden');
-}
-
-function closeRagDock() {
-    if (elements.dockedRagWidget) elements.dockedRagWidget.classList.add('hidden');
-}
-
-function resetRagUploadButton() {
-    if (elements.btnUploadRagFile) {
-        elements.btnUploadRagFile.disabled = false;
-        elements.btnUploadRagFile.innerHTML = `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg> Parse, LLM Chunk & Ingest to Vector DB`;
-    }
-}
-
-function handleRagFileUpload(e) {
-    e.preventDefault();
-    if (!selectedRagFile) {
-        showToast("Please select a document file to upload.", "warning");
-        return;
-    }
-
-    const category = elements.ragFileCategory ? elements.ragFileCategory.value : "Architectures";
-    const formData = new FormData();
-    formData.append("file", selectedRagFile);
-    formData.append("category", category);
-
-    if (elements.btnUploadRagFile) {
-        elements.btnUploadRagFile.disabled = true;
-        elements.btnUploadRagFile.innerHTML = `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg> ⌛ Ingestion Started...`;
-    }
-
-    if (elements.ragProgressSection) elements.ragProgressSection.classList.remove('hidden');
-    if (elements.ragLiveLogList) elements.ragLiveLogList.innerHTML = '<li>⚡ Initializing background ingestion process...</li>';
-    if (elements.ragProgressBarFill) elements.ragProgressBarFill.style.width = '5%';
-    if (elements.ragProgressPercentage) elements.ragProgressPercentage.innerText = '5%';
-    if (elements.ragProgressStatusText) elements.ragProgressStatusText.innerText = '⚡ Starting file processing...';
-
-    fetch('/api/rag/upload-file', {
-        method: 'POST',
-        body: formData
-    })
-    .then(res => {
-        if (!res.ok) return res.json().then(err => { throw new Error(err.detail || 'File upload failed'); });
-        return res.json();
-    })
-    .then(data => {
-        if (data.job_id) {
-            activeRagJobId = data.job_id;
-            startPollingRagJob(data.job_id);
-        }
-    })
-    .catch(err => {
-        showToast(`Failed to start ingestion: ${err.message}`, 'warning');
-        resetRagUploadButton();
-    });
-}
-
-function startPollingRagJob(jobId) {
-    if (activeRagJobInterval) {
-        clearInterval(activeRagJobInterval);
-        activeRagJobInterval = null;
-    }
-    
-    let pollCount = 0;
-    activeRagJobInterval = setInterval(() => {
-        pollCount++;
-        fetch(`/api/rag/jobs/${jobId}`)
-        .then(res => res.json())
-        .then(job => {
-            updateRagJobProgressUI(job);
-            
-            const isCompleted = job.status === 'completed' || (job.progress_percent !== undefined && job.progress_percent >= 100);
-            const isError = job.status === 'error' || job.status === 'not_found';
-
-            if (isCompleted || isError) {
-                if (activeRagJobInterval) {
-                    clearInterval(activeRagJobInterval);
-                    activeRagJobInterval = null;
-                }
-                
-                resetRagUploadButton();
-                clearSelectedRagFile();
-                fetchRagDocuments();
-
-                if (isCompleted) {
-                    showToast("🎉 Ingestion completed successfully!");
-                    setTimeout(() => {
-                        if (elements.ragProgressSection) elements.ragProgressSection.classList.add('hidden');
-                        closeRagDock();
-                    }, 1000);
-                } else {
-                    showToast(`RAG Ingestion Error: ${job.error || 'Processing failed'}`, 'warning');
-                }
-            } else if (pollCount > 300) { // Safety max timeout 4 minutes
-                if (activeRagJobInterval) {
-                    clearInterval(activeRagJobInterval);
-                    activeRagJobInterval = null;
-                }
-                resetRagUploadButton();
-                showToast("RAG ingestion status timed out.", "warning");
-            }
-        })
-        .catch(err => {
-            console.error("Error polling RAG job:", err);
-        });
-    }, 2500);
-}
-
-function updateRagJobProgressUI(job) {
-    const pct = Math.min(100, Math.round(job.progress_percent || 0));
-    
-    if (elements.ragProgressBarFill) elements.ragProgressBarFill.style.width = `${pct}%`;
-    if (elements.ragProgressPercentage) elements.ragProgressPercentage.innerText = `${pct}%`;
-    
-    const pageInfo = job.total_pages ? ` (Page ${job.current_page || 1}/${job.total_pages})` : '';
-    const statusMsg = job.status === 'completed' ? '🎉 Ingestion Complete!' : (job.status === 'error' ? '❌ Failed' : `⚡ Ingesting ${job.file_name || 'file'}${pageInfo}`);
-    
-    if (elements.ragProgressStatusText) elements.ragProgressStatusText.innerText = statusMsg;
-
-    if (elements.dockedRagProgressBar) elements.dockedRagProgressBar.style.width = `${pct}%`;
-    if (elements.dockedRagStatusText) elements.dockedRagStatusText.innerText = `${statusMsg} [${pct}%]`;
-
-    if (elements.ragLiveLogList && job.logs && job.logs.length > 0) {
-        elements.ragLiveLogList.innerHTML = job.logs.map(l => `<li>${escapeHtml(l)}</li>`).join('');
-        const logContainer = elements.ragLiveLogList.parentElement;
-        if (logContainer) logContainer.scrollTop = logContainer.scrollHeight;
-    }
-}
-
-function handleRagIngest(e) {
-    e.preventDefault();
-    const title = elements.ragTitle.value.trim();
-    const category = elements.ragCategory.value;
-    const content = elements.ragContent.value.trim();
-
-    if (!title || !content) return;
-
-    fetch('/api/rag/ingest', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ title, category, content })
-    })
-    .then(res => res.json())
-    .then(data => {
-        showToast("Information is stored successfully!");
-        if (elements.ragTitle) elements.ragTitle.value = '';
-        if (elements.ragContent) elements.ragContent.value = '';
-        if (elements.ragIngestForm) elements.ragIngestForm.reset();
-        fetchRagDocuments();
-    })
-    .catch(err => {
-        showToast(`Failed to index document: ${err.message}`, 'warning');
-    });
-}
-
 // ----------------------------------------------------
 // AI Assistant Chatbot Widget & Dynamic Charts
 // ----------------------------------------------------
@@ -2625,6 +2387,7 @@ let chatChartCounter = 0;
 
 function handleChatSubmit(e) {
     if (e && e.preventDefault) e.preventDefault();
+    if (!elements.chatInput) return;
     const message = elements.chatInput.value.trim();
     if (!message) return;
 
@@ -2761,20 +2524,6 @@ function handleRowContextMenu(e, rowData) {
     contextMenu.classList.remove('hidden');
 }
 
-// Bind Context Menu Items
-document.addEventListener('DOMContentLoaded', () => {
-    const analyzeLogBtn = document.getElementById('menu-analyze-log');
-    if (analyzeLogBtn) {
-        analyzeLogBtn.addEventListener('click', (e) => {
-            e.stopPropagation();
-            document.getElementById('row-context-menu').classList.add('hidden');
-            if (contextMenuTargetRow) {
-                runLogAnalysis(contextMenuTargetRow);
-            }
-        });
-    }
-});
-
 // UI Elements for Log Analysis
 const elementsLogAnalysis = {
     modal: document.getElementById('log-analysis-modal'),
@@ -2831,7 +2580,6 @@ function runLogAnalysis(rowData) {
     }
     logAnalysisAbortController = new AbortController();
 
-    // Track which row index we are analyzing for live UI update on completion
     logAnalysisTargetRowIndex = rowData.index !== undefined ? parseInt(rowData.index) : null;
 
     if (elementsLogAnalysis.modal) elementsLogAnalysis.modal.classList.add('hidden');
@@ -2864,7 +2612,6 @@ function runLogAnalysis(rowData) {
             updateLogAnalysisStatusUI('completed', '🎉 Analysis Complete! (Click to View)');
             showToast('🎉 Log Analysis Generated!');
 
-            // ── Live update: patch the AI Analysis cell without a full page reload ──
             if (completedRowIndex !== null && data.report_markdown) {
                 updateAiAnalysisCellLive(completedRowIndex, data.report_markdown);
             }
@@ -2889,12 +2636,7 @@ function runLogAnalysis(rowData) {
     });
 }
 
-/**
- * Surgically updates the "AI Analysis" column cell in the live table grid
- * and patches in-memory appState without a full data reload.
- */
 function updateAiAnalysisCellLive(rowIndex, reportMarkdown) {
-    // 1. Patch in-memory state
     const allIdx = appState.allData.findIndex(r => r.index === rowIndex);
     if (allIdx !== -1) {
         appState.allData[allIdx]['AI Analysis'] = reportMarkdown;
@@ -2904,7 +2646,6 @@ function updateAiAnalysisCellLive(rowIndex, reportMarkdown) {
         appState.filteredData[filtIdx]['AI Analysis'] = reportMarkdown;
     }
 
-    // 2. Find the rendered row in the DOM and patch its AI Analysis cell surgically
     const rowEl = document.querySelector(`tr[data-index="${rowIndex}"]`);
     if (rowEl && appState.columns.includes('AI Analysis')) {
         const colIdx = appState.columns.indexOf('AI Analysis');
@@ -2915,7 +2656,6 @@ function updateAiAnalysisCellLive(rowIndex, reportMarkdown) {
                 <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
                 View Report
             </button>`;
-            // Flash the row to signal success
             rowEl.classList.add('row-success');
             setTimeout(() => rowEl.classList.remove('row-success'), 1500);
 
@@ -2956,8 +2696,19 @@ function downloadLogAnalysisReport() {
     showToast(`Downloaded Log Analysis Report (${filename})`);
 }
 
-// Bind Log Analysis UI Events
 document.addEventListener('DOMContentLoaded', () => {
+    const analyzeLogBtn = document.getElementById('menu-analyze-log');
+    if (analyzeLogBtn) {
+        analyzeLogBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const ctxMenu = document.getElementById('row-context-menu');
+            if (ctxMenu) ctxMenu.classList.add('hidden');
+            if (contextMenuTargetRow) {
+                runLogAnalysis(contextMenuTargetRow);
+            }
+        });
+    }
+
     if (elementsLogAnalysis.btnDock) {
         elementsLogAnalysis.btnDock.addEventListener('click', () => {
             if (elementsLogAnalysis.modal) elementsLogAnalysis.modal.classList.add('hidden');
@@ -2990,3 +2741,5 @@ document.addEventListener('DOMContentLoaded', () => {
         elementsLogAnalysis.btnDownload.addEventListener('click', downloadLogAnalysisReport);
     }
 });
+
+

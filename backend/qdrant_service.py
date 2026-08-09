@@ -268,3 +268,115 @@ def get_all_knowledge_items_full() -> List[Dict[str, Any]]:
         except Exception as e:
             print(f"Error fetching full RAG items: {e}")
             return []
+
+def get_knowledge_chunks(category: Optional[str] = None, search: Optional[str] = None, page: int = 1, page_size: int = 20) -> Dict[str, Any]:
+    """Fetches paginated, filtered chunks from the knowledge base."""
+    init_qdrant_storage()
+    with db_lock:
+        try:
+            conn = get_connection()
+            cursor = conn.cursor()
+            
+            query = "SELECT id, title, category, content, created_at FROM rag_knowledge_base"
+            count_query = "SELECT COUNT(*) FROM rag_knowledge_base"
+            
+            conditions = []
+            params = []
+            
+            if category and category.lower() != "all":
+                conditions.append("category = ?")
+                params.append(category)
+                
+            if search and search.strip():
+                conditions.append("(content LIKE ? OR title LIKE ?)")
+                search_term = f"%{search.strip()}%"
+                params.extend([search_term, search_term])
+                
+            if conditions:
+                where_clause = " WHERE " + " AND ".join(conditions)
+                query += where_clause
+                count_query += where_clause
+                
+            cursor.execute(count_query, params)
+            total_count = cursor.fetchone()[0]
+            
+            query += " ORDER BY created_at DESC LIMIT ? OFFSET ?"
+            params.extend([page_size, (page - 1) * page_size])
+            
+            cursor.execute(query, params)
+            rows = cursor.fetchall()
+            conn.close()
+            
+            chunks = [{"id": r[0], "title": r[1], "category": r[2], "content": r[3], "created_at": r[4]} for r in rows]
+            
+            return {
+                "chunks": chunks,
+                "total": total_count,
+                "page": page,
+                "page_size": page_size
+            }
+        except Exception as e:
+            print(f"Error fetching RAG chunks: {e}")
+            return {"chunks": [], "total": 0, "page": page, "page_size": page_size}
+
+def delete_knowledge_chunk(chunk_id: str) -> bool:
+    """Deletes a single knowledge chunk by ID from both vector storage (Qdrant) and fallback storage (SQLite)."""
+    init_qdrant_storage()
+    
+    # 1. Delete from Qdrant Cloud / Server vector storage if configured
+    client = get_qdrant_client()
+    if client:
+        try:
+            from qdrant_client.http import models
+            collection_name = "diagtrace_knowledge"
+            point_id = hash(chunk_id) % (2**31)
+            
+            # Delete by point ID
+            if hasattr(client, 'delete_points'):
+                client.delete_points(
+                    collection_name=collection_name,
+                    points=[point_id],
+                    wait=True
+                )
+            elif hasattr(client, 'delete'):
+                client.delete(
+                    collection_name=collection_name,
+                    points_selector=models.PointIdsList(points=[point_id]),
+                    wait=True
+                )
+            
+            # Also attempt payload filter deletion in case doc_id was set in payload
+            try:
+                if hasattr(client, 'delete_points'):
+                    client.delete_points(
+                        collection_name=collection_name,
+                        points=models.Filter(
+                            must=[
+                                models.FieldCondition(
+                                    key="doc_id",
+                                    match=models.MatchValue(value=chunk_id)
+                                )
+                            ]
+                        ),
+                        wait=True
+                    )
+            except Exception:
+                pass
+        except Exception as e:
+            print(f"Qdrant vector deletion notice for chunk '{chunk_id}': {e}")
+
+    # 2. Delete from local SQLite table
+    with db_lock:
+        try:
+            conn = get_connection()
+            cursor = conn.cursor()
+            cursor.execute("DELETE FROM rag_knowledge_base WHERE id = ?", (chunk_id,))
+            rows_affected = cursor.rowcount
+            conn.commit()
+            conn.close()
+            return rows_affected > 0
+        except Exception as e:
+            print(f"Error deleting RAG chunk {chunk_id} from SQLite: {e}")
+            return False
+
+
