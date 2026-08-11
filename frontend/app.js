@@ -130,6 +130,8 @@ const elements = {
     rcaClose: document.getElementById('rca-close'),
     rcaLoading: document.getElementById('rca-loading'),
     rcaReportBody: document.getElementById('rca-report-body'),
+    rcaScopeSelect: document.getElementById('rca-scope-select'),
+    rcaChartsContainer: document.getElementById('rca-charts-container'),
     
     ragModal: document.getElementById('rag-section'), // kept as ragModal for compatibility
     ragClose: document.getElementById('rag-close'),
@@ -284,6 +286,7 @@ function setupEventListeners() {
     if (elements.btnCloseDockedRca) elements.btnCloseDockedRca.addEventListener('click', closeRcaDock);
     if (elements.dockedRcaBody) elements.dockedRcaBody.addEventListener('click', maximizeRcaDock);
     if (elements.rcaClose) elements.rcaClose.addEventListener('click', closeRcaModal);
+    if (elements.rcaScopeSelect) elements.rcaScopeSelect.addEventListener('change', runAiRcaAnalysis);
     
     // AI Chatbot Widget Controls
     if (elements.chatWidgetToggle) elements.chatWidgetToggle.addEventListener('click', toggleChatDrawer);
@@ -2299,6 +2302,30 @@ function updateRcaStatusUI(status, message) {
     }
 }
 
+function fetchRcaFiles() {
+    fetch('/api/ai/rca/files')
+        .then(res => res.json())
+        .then(data => {
+            if (data.status === 'success' && elements.rcaScopeSelect) {
+                const fleetOption = elements.rcaScopeSelect.options[0];
+                const currentValue = elements.rcaScopeSelect.value;
+                elements.rcaScopeSelect.innerHTML = '';
+                elements.rcaScopeSelect.appendChild(fleetOption);
+                
+                data.files.forEach(file => {
+                    if (file) {
+                        const opt = document.createElement('option');
+                        opt.value = file;
+                        opt.textContent = `File: ${file}`;
+                        elements.rcaScopeSelect.appendChild(opt);
+                    }
+                });
+                elements.rcaScopeSelect.value = currentValue;
+            }
+        })
+        .catch(err => console.error("Failed to fetch RCA files:", err));
+}
+
 function runAiRcaAnalysis() {
     if (rcaAbortController) {
         rcaAbortController.abort();
@@ -2308,11 +2335,19 @@ function runAiRcaAnalysis() {
     if (elements.rcaModal) elements.rcaModal.classList.remove('hidden');
     if (elements.rcaLoading) elements.rcaLoading.classList.remove('hidden');
     if (elements.rcaReportBody) elements.rcaReportBody.innerHTML = '';
+    if (elements.rcaChartsContainer) elements.rcaChartsContainer.innerHTML = '';
     if (elements.btnDownloadRca) elements.btnDownloadRca.classList.add('hidden');
 
-    updateRcaStatusUI('running', '⚡ Synthesizing RCA report (DTC Trends + RAG)...');
+    const scope = elements.rcaScopeSelect ? elements.rcaScopeSelect.value : 'fleet';
+    const endpoint = scope === 'fleet' ? '/api/ai/rca' : `/api/ai/rca/file/${encodeURIComponent(scope)}`;
+    
+    if (elements.rcaScopeSelect && elements.rcaScopeSelect.options.length <= 1) {
+        fetchRcaFiles();
+    }
 
-    fetch('/api/ai/rca', { method: 'POST', signal: rcaAbortController.signal })
+    updateRcaStatusUI('running', `⚡ Synthesizing RCA report for ${scope === 'fleet' ? 'Fleet' : scope}...`);
+
+    fetch(endpoint, { method: 'POST', signal: rcaAbortController.signal })
     .then(res => res.json())
     .then(data => {
         rcaAbortController = null;
@@ -2322,6 +2357,16 @@ function runAiRcaAnalysis() {
             elements.rcaReportBody.innerHTML = renderMarkdownSimple(data.report_markdown);
             if (elements.btnDownloadRca && data.report_markdown) {
                 elements.btnDownloadRca.classList.remove('hidden');
+            }
+            if (data.chart_data && elements.rcaChartsContainer && typeof Chart !== 'undefined') {
+                Object.entries(data.chart_data).forEach(([chartId, config]) => {
+                    const canvasWrapper = document.createElement('div');
+                    canvasWrapper.style = "background: var(--bg-surface); padding: 12px; border-radius: 8px; border: 1px solid var(--border-color); position: relative; height: 350px; width: 100%;";
+                    const canvas = document.createElement('canvas');
+                    canvasWrapper.appendChild(canvas);
+                    elements.rcaChartsContainer.appendChild(canvasWrapper);
+                    new Chart(canvas.getContext('2d'), config);
+                });
             }
             updateRcaStatusUI('completed', '🎉 RCA Report Generated! (Click to View)');
             showToast('🎉 AI Root Cause Analysis Report Generated!');

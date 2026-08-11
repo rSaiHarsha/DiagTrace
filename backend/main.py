@@ -21,7 +21,10 @@ from backend.rag_engine import (
     process_file_ingestion_background, get_rag_job_status
 )
 from backend.qdrant_service import get_all_knowledge_documents, set_qdrant_config, get_knowledge_chunks, delete_knowledge_chunk
-from backend.rca_engine import run_ai_rca_analysis, get_weekly_ai_summary
+from backend.rca_engine import (
+    run_ai_rca_analysis, get_weekly_ai_summary,
+    list_available_log_files, run_per_file_quick_stats, run_ai_rca_analysis_for_file
+)
 from backend.log_analysis_engine import run_log_analysis
 from backend.chatbot_engine import process_chatbot_query
 from backend.nvidia_client import get_nvidia_model, get_nvidia_embed_model, set_nvidia_ai_config
@@ -390,6 +393,44 @@ def rag_documents_endpoint():
 
 import asyncio
 from fastapi import Request
+
+@app.get("/api/ai/rca/files")
+def get_available_log_files():
+    try:
+        files = list_available_log_files()
+        return {"status": "success", "files": files}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to fetch log files: {str(e)}")
+
+@app.get("/api/ai/rca/quick-stats")
+def get_quick_stats():
+    try:
+        stats = run_per_file_quick_stats()
+        return stats
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to fetch quick stats: {str(e)}")
+
+@app.post("/api/ai/rca/file/{file_name}")
+async def ai_rca_file_endpoint(file_name: str, request: Request):
+    abort_event = threading.Event()
+    
+    # Run in a separate thread so we can poll for client disconnection
+    task = asyncio.create_task(asyncio.to_thread(run_ai_rca_analysis_for_file, file_name, "rca", abort_event))
+    
+    while not task.done():
+        if await request.is_disconnected():
+            abort_event.set()
+            task.cancel()
+            print(f"RCA Analysis for {file_name} cancelled by client disconnect")
+            raise HTTPException(status_code=499, detail="Client Closed Request")
+        await asyncio.sleep(0.5)
+        
+    try:
+        return task.result()
+    except Exception as e:
+        if "Cancelled" in str(e):
+            raise HTTPException(status_code=499, detail="Cancelled")
+        raise HTTPException(status_code=500, detail=f"AI RCA Analysis for {file_name} failed: {str(e)}")
 
 @app.post("/api/ai/rca")
 async def ai_rca_endpoint(request: Request):

@@ -823,10 +823,12 @@ The Knowledge Base is the "brain" that gives DiagTrace domain-specific automotiv
 
 | Format | Handler |
 |--------|---------|
-| `.pdf` | pypdf multi-page extraction |
+| `.pdf` | PyMuPDF structural layout text, markdown table extraction & image OCR |
 | `.docx` | python-docx paragraph + table extraction |
 | `.txt`, `.log`, `.md`, `.csv` | UTF-8/Latin-1 plain text decoding |
 | `.json` | Parsed and pretty-printed as structured text |
+| `.png`, `.jpg`, `.jpeg`, `.webp` | NVIDIA Vision OCR & ECU Architecture SysML v2 diagram conversion |
+
 
 ### Ingestion Pipeline
 
