@@ -964,6 +964,16 @@ def _run(mode: str, abort_event=None, df: Optional[pd.DataFrame] = None, scope_l
     initial_docs = _targeted_rag_retrieval(features)
     result = _run_agentic_analysis(features, initial_docs, mode=mode, abort_event=abort_event, scope_label=scope_label)
 
+    # Auto-save report to SQLite database so it appears in reports repository (reports.js)
+    try:
+        from backend.database import save_report
+        title_scope = scope_label.replace('-', ' ').title() if scope_label else "Fleet Wide"
+        report_title = f"AI RCA Diagnostic Report ({title_scope})"
+        chart_data_str = json.dumps(chart_data) if chart_data else None
+        save_report(report_title, "RCA", result.get("report_markdown", ""), chart_data_str)
+    except Exception as e:
+        print(f"Failed to auto-save RCA report: {e}")
+
     return {
         "status": "success",
         "scope": scope_label,

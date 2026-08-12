@@ -6,6 +6,13 @@ import threading
 import urllib.request
 import webbrowser
 
+if hasattr(sys.stdout, "reconfigure"):
+    try:
+        sys.stdout.reconfigure(encoding="utf-8")
+        sys.stderr.reconfigure(encoding="utf-8")
+    except Exception:
+        pass
+
 def open_browser(url: str):
     """
     Waits for the FastAPI backend to start responding and opens the application in the default web browser.
@@ -46,12 +53,12 @@ def run():
     url = f"http://{host}:{port}"
 
     print("=" * 65)
-    print(" ⚡ DiagTrace - Enterprise Vehicle Diagnostics Portal")
+    print(" [*] DiagTrace - Enterprise Vehicle Diagnostics Portal")
     print("=" * 65)
-    print(f" ► Python Interpreter : {python_exe}")
-    print(f" ► Host & Port        : {host}:{port}")
-    print(f" ► Application URL    : {url}")
-    print(f" ► Served Architecture: FastAPI Backend (API) + Static Frontend (UI)")
+    print(f"  * Python Interpreter : {python_exe}")
+    print(f"  * Host & Port        : {host}:{port}")
+    print(f"  * Application URL    : {url}")
+    print(f"  * Served Architecture: FastAPI Backend (API) + Static Frontend (UI)")
     print("-" * 65)
     print(" Starting server... Press Ctrl+C to exit.")
     print("=" * 65)

@@ -1,7 +1,15 @@
 import io
 import os
+import sys
 import threading
 from datetime import datetime
+
+if hasattr(sys.stdout, "reconfigure"):
+    try:
+        sys.stdout.reconfigure(encoding="utf-8")
+        sys.stderr.reconfigure(encoding="utf-8")
+    except Exception:
+        pass
 from typing import Optional, List, Dict, Any
 from fastapi import FastAPI, UploadFile, File, Form, BackgroundTasks, HTTPException, Header, Depends, Query, Response
 from fastapi.middleware.cors import CORSMiddleware
@@ -14,7 +22,8 @@ import uuid
 from backend.parser import DiagnosticParser
 from backend.database import (
     init_db, load_from_db, save_to_db, update_row, merge_and_deduplicate,
-    create_user, authenticate_user, create_session, get_user_by_token, delete_session, update_ai_analysis
+    create_user, authenticate_user, create_session, get_user_by_token, delete_session, update_ai_analysis,
+    save_report, get_all_reports, get_report_by_id, delete_report
 )
 from backend.rag_engine import (
     ingest_knowledge_document, ingest_file_document, 
@@ -83,6 +92,12 @@ class RAGIngestRequest(BaseModel):
 
 class ChatQueryRequest(BaseModel):
     message: str
+
+class SaveReportRequest(BaseModel):
+    title: str
+    type: str = "RCA"
+    content_markdown: str
+    chart_data: Optional[Dict[str, Any]] = None
 
 class AISettingsRequest(BaseModel):
     nvidia_api_key: Optional[str] = None
@@ -478,6 +493,12 @@ async def api_analyze_log(row_data: dict, request: Request):
                     update_ai_analysis(row_index, result.get("report_markdown", ""))
                 except ValueError:
                     pass
+            try:
+                row_id = row_data.get("index", "")
+                log_title = f"Single Log Context Analysis (Row #{row_id})"
+                save_report(log_title, "LOG", result.get("report_markdown", ""), None)
+            except Exception as e:
+                print(f"Failed to auto-save Log analysis report: {e}")
         return result
     except Exception as e:
         if "Cancelled" in str(e):
@@ -499,6 +520,52 @@ def ai_chat_endpoint(payload: ChatQueryRequest):
         return res
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"AI Chatbot error: {str(e)}")
+
+# --- Saved Reports API ---
+
+@app.get("/api/reports")
+def list_reports_endpoint():
+    try:
+        reports = get_all_reports()
+        return {"status": "success", "reports": reports}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to list reports: {str(e)}")
+
+@app.get("/api/reports/{report_id}")
+def get_report_endpoint(report_id: int):
+    try:
+        report = get_report_by_id(report_id)
+        if not report:
+            raise HTTPException(status_code=404, detail="Report not found")
+        return {"status": "success", "report": report}
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to get report: {str(e)}")
+
+import json
+
+@app.post("/api/reports")
+def create_report_endpoint(payload: SaveReportRequest):
+    try:
+        chart_data_str = json.dumps(payload.chart_data) if payload.chart_data else None
+        report_id = save_report(payload.title, payload.type, payload.content_markdown, chart_data_str)
+        return {"status": "success", "id": report_id, "message": "Report saved successfully."}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to save report: {str(e)}")
+
+@app.delete("/api/reports/{report_id}")
+def delete_report_endpoint(report_id: int):
+    try:
+        success = delete_report(report_id)
+        if not success:
+            raise HTTPException(status_code=404, detail="Report not found")
+        return {"status": "success", "message": "Report deleted successfully."}
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to delete report: {str(e)}")
+
 
 @app.get("/api/settings/ai")
 def get_ai_settings():

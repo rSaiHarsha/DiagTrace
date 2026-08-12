@@ -46,6 +46,16 @@ def init_db():
                     Hex TEXT
                 )
             """)
+            
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS saved_reports (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    title TEXT,
+                    type TEXT,
+                    content_markdown TEXT,
+                    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+                )
+            """)
             # Migrate existing databases: add Raw, Hex, and AI Analysis columns if missing
             try:
                 cursor.execute("ALTER TABLE diagnostics ADD COLUMN Raw TEXT")
@@ -54,6 +64,10 @@ def init_db():
             try:
                 cursor.execute("ALTER TABLE diagnostics ADD COLUMN Hex TEXT")
             except Exception:
+                pass  # Column already exists
+            try:
+                cursor.execute("ALTER TABLE saved_reports ADD COLUMN chart_data TEXT")
+            except sqlite3.OperationalError:
                 pass  # Column already exists
             try:
                 cursor.execute("ALTER TABLE diagnostics ADD COLUMN [AI Analysis] TEXT")
@@ -324,3 +338,53 @@ def merge_and_deduplicate(new_df: pd.DataFrame) -> pd.DataFrame:
         return combined_df
     else:
         return existing_df
+
+
+# --- Saved Reports Operations ---
+
+def save_report(title: str, report_type: str, content_markdown: str, chart_data: str = None) -> int:
+    """Saves a generated report to the database."""
+    with db_lock:
+        conn = get_connection()
+        cursor = conn.cursor()
+        cursor.execute(
+            "INSERT INTO saved_reports (title, type, content_markdown, chart_data) VALUES (?, ?, ?, ?)",
+            (title, report_type, content_markdown, chart_data)
+        )
+        conn.commit()
+        report_id = cursor.lastrowid
+        conn.close()
+        return report_id
+
+def get_all_reports() -> List[Dict[str, Any]]:
+    """Retrieves all saved reports."""
+    conn = get_connection()
+    conn.row_factory = sqlite3.Row
+    cursor = conn.cursor()
+    cursor.execute("SELECT id, title, type, created_at FROM saved_reports ORDER BY created_at DESC")
+    rows = cursor.fetchall()
+    conn.close()
+    return [dict(row) for row in rows]
+
+def get_report_by_id(report_id: int) -> Optional[Dict[str, Any]]:
+    """Retrieves a specific report by its ID."""
+    conn = get_connection()
+    conn.row_factory = sqlite3.Row
+    cursor = conn.cursor()
+    cursor.execute("SELECT * FROM saved_reports WHERE id = ?", (report_id,))
+    row = cursor.fetchone()
+    conn.close()
+    if row:
+        return dict(row)
+    return None
+
+def delete_report(report_id: int) -> bool:
+    """Deletes a specific report by its ID."""
+    with db_lock:
+        conn = get_connection()
+        cursor = conn.cursor()
+        cursor.execute("DELETE FROM saved_reports WHERE id = ?", (report_id,))
+        rows_affected = cursor.rowcount
+        conn.commit()
+        conn.close()
+        return rows_affected > 0

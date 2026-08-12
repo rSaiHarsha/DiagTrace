@@ -117,6 +117,7 @@ const elements = {
     
     // AI RCA & RAG & Chatbot
     btnRunRca: document.getElementById('btn-sidebar-rca-nav'),
+    btnStartRca: document.getElementById('btn-start-rca'),
     btnDownloadRca: document.getElementById('btn-download-rca'),
     btnDockRca: document.getElementById('btn-dock-rca'),
     dockedRcaWidget: document.getElementById('docked-rca-widget'),
@@ -242,6 +243,12 @@ function initApp() {
     checkEngineStatus();
     loadRegistryData();
     loadAppVersion();
+    restoreRcaSessionState();
+    
+    const urlParams = new URLSearchParams(window.location.search);
+    if (urlParams.get('open') === 'rca') {
+        openRcaModal();
+    }
     
     window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => {
         if (appState.currentTheme === 'system' && appState.allData.length > 0) {
@@ -279,14 +286,14 @@ function setupEventListeners() {
     }
     
     // AI RCA & RAG Knowledge Base Controls
-    if (elements.btnRunRca) elements.btnRunRca.addEventListener('click', runAiRcaAnalysis);
+    if (elements.btnRunRca) elements.btnRunRca.addEventListener('click', openRcaModal);
+    if (elements.btnStartRca) elements.btnStartRca.addEventListener('click', runAiRcaAnalysis);
     if (elements.btnDownloadRca) elements.btnDownloadRca.addEventListener('click', downloadRcaReport);
     if (elements.btnDockRca) elements.btnDockRca.addEventListener('click', dockRcaModal);
     if (elements.btnMaximizeDockedRca) elements.btnMaximizeDockedRca.addEventListener('click', maximizeRcaDock);
     if (elements.btnCloseDockedRca) elements.btnCloseDockedRca.addEventListener('click', closeRcaDock);
     if (elements.dockedRcaBody) elements.dockedRcaBody.addEventListener('click', maximizeRcaDock);
     if (elements.rcaClose) elements.rcaClose.addEventListener('click', closeRcaModal);
-    if (elements.rcaScopeSelect) elements.rcaScopeSelect.addEventListener('change', runAiRcaAnalysis);
     
     // AI Chatbot Widget Controls
     if (elements.chatWidgetToggle) elements.chatWidgetToggle.addEventListener('click', toggleChatDrawer);
@@ -2259,14 +2266,89 @@ function closeChartDialog() {
 // ----------------------------------------------------
 // AI Root Cause Analysis (RCA) & RAG Knowledge Base
 // ----------------------------------------------------
+// ----------------------------------------------------
+// AI Root Cause Analysis (RCA) & RAG Knowledge Base Session Persistence
+// ----------------------------------------------------
+const RCA_STORAGE_KEY = 'diagtrace_rca_session_state';
+
+function getRcaSessionState() {
+    try {
+        const raw = sessionStorage.getItem(RCA_STORAGE_KEY);
+        return raw ? JSON.parse(raw) : null;
+    } catch (e) {
+        return null;
+    }
+}
+
+function saveRcaSessionState(overrides = {}) {
+    const currentState = getRcaSessionState() || {};
+    const newState = {
+        isDocked: overrides.isDocked !== undefined ? overrides.isDocked : currentState.isDocked || false,
+        isModalOpen: overrides.isModalOpen !== undefined ? overrides.isModalOpen : currentState.isModalOpen || false,
+        statusText: overrides.statusText !== undefined ? overrides.statusText : currentState.statusText || '',
+        progressWidth: overrides.progressWidth !== undefined ? overrides.progressWidth : currentState.progressWidth || '0%',
+        progressBg: overrides.progressBg !== undefined ? overrides.progressBg : currentState.progressBg || 'var(--primary)',
+        lastRcaMarkdown: appState.lastRcaMarkdown || currentState.lastRcaMarkdown || '',
+        rcaReportBodyHtml: elements.rcaReportBody ? elements.rcaReportBody.innerHTML : currentState.rcaReportBodyHtml || '',
+        scope: elements.rcaScopeSelect ? elements.rcaScopeSelect.value : currentState.scope || 'fleet',
+        timestamp: Date.now()
+    };
+    try {
+        sessionStorage.setItem(RCA_STORAGE_KEY, JSON.stringify(newState));
+    } catch (e) {
+        console.error("Failed to save RCA session state", e);
+    }
+}
+
+function clearRcaSessionState() {
+    try {
+        sessionStorage.removeItem(RCA_STORAGE_KEY);
+    } catch (e) {}
+}
+
+function restoreRcaSessionState() {
+    const saved = getRcaSessionState();
+    if (!saved) return;
+
+    if (saved.lastRcaMarkdown) {
+        appState.lastRcaMarkdown = saved.lastRcaMarkdown;
+    }
+
+    if (saved.statusText && elements.dockedRcaStatusText) {
+        elements.dockedRcaStatusText.innerText = saved.statusText;
+    }
+    if (elements.dockedRcaProgressBar) {
+        elements.dockedRcaProgressBar.style.width = saved.progressWidth || '100%';
+        elements.dockedRcaProgressBar.style.backgroundColor = saved.progressBg || '#10b981';
+    }
+
+    if (saved.rcaReportBodyHtml && elements.rcaReportBody && (!elements.rcaReportBody.innerText || !elements.rcaReportBody.innerText.trim())) {
+        elements.rcaReportBody.innerHTML = saved.rcaReportBodyHtml;
+    }
+
+    if (saved.lastRcaMarkdown && elements.btnDownloadRca) {
+        elements.btnDownloadRca.classList.remove('hidden');
+    }
+
+    if (saved.isDocked) {
+        if (elements.rcaModal) elements.rcaModal.classList.add('hidden');
+        if (elements.dockedRcaWidget) elements.dockedRcaWidget.classList.remove('hidden');
+    } else if (saved.isModalOpen) {
+        if (elements.dockedRcaWidget) elements.dockedRcaWidget.classList.add('hidden');
+        if (elements.rcaModal) elements.rcaModal.classList.remove('hidden');
+    }
+}
+
 function dockRcaModal() {
     if (elements.rcaModal) elements.rcaModal.classList.add('hidden');
     if (elements.dockedRcaWidget) elements.dockedRcaWidget.classList.remove('hidden');
+    saveRcaSessionState({ isDocked: true, isModalOpen: false });
 }
 
 function maximizeRcaDock() {
     if (elements.dockedRcaWidget) elements.dockedRcaWidget.classList.add('hidden');
     if (elements.rcaModal) elements.rcaModal.classList.remove('hidden');
+    saveRcaSessionState({ isDocked: false, isModalOpen: true });
 }
 
 let rcaAbortController = null;
@@ -2277,6 +2359,7 @@ function stopRcaAnalysis() {
         rcaAbortController = null;
         showToast("RCA process stopped.", "warning");
     }
+    clearRcaSessionState();
     if (elements.dockedRcaWidget) elements.dockedRcaWidget.classList.add('hidden');
     if (elements.rcaModal) elements.rcaModal.classList.add('hidden');
     if (elements.rcaLoading) elements.rcaLoading.classList.add('hidden');
@@ -2288,17 +2371,66 @@ function closeRcaDock() {
 
 function updateRcaStatusUI(status, message) {
     if (elements.dockedRcaStatusText) elements.dockedRcaStatusText.innerText = message;
+    let width = '0%';
+    let bg = 'var(--primary)';
     if (elements.dockedRcaProgressBar) {
         if (status === 'running') {
-            elements.dockedRcaProgressBar.style.width = '45%';
-            elements.dockedRcaProgressBar.style.backgroundColor = 'var(--primary)';
+            width = '45%';
+            bg = 'var(--primary)';
         } else if (status === 'completed') {
-            elements.dockedRcaProgressBar.style.width = '100%';
-            elements.dockedRcaProgressBar.style.backgroundColor = '#10b981';
+            width = '100%';
+            bg = '#10b981';
         } else if (status === 'error') {
-            elements.dockedRcaProgressBar.style.width = '100%';
-            elements.dockedRcaProgressBar.style.backgroundColor = '#ef4444';
+            width = '100%';
+            bg = '#ef4444';
         }
+        elements.dockedRcaProgressBar.style.width = width;
+        elements.dockedRcaProgressBar.style.backgroundColor = bg;
+    }
+    saveRcaSessionState({ statusText: message, progressWidth: width, progressBg: bg });
+}
+
+function openRcaModal() {
+    if (elements.dockedRcaWidget) {
+        elements.dockedRcaWidget.classList.add('hidden');
+    }
+    if (elements.rcaModal) {
+        elements.rcaModal.classList.remove('hidden');
+    }
+    saveRcaSessionState({ isDocked: false, isModalOpen: true });
+    fetchRcaFiles();
+
+    if (appState.lastRcaMarkdown && elements.btnDownloadRca) {
+        elements.btnDownloadRca.classList.remove('hidden');
+    }
+
+    const hasReportContent = appState.lastRcaMarkdown || 
+        (elements.rcaReportBody && elements.rcaReportBody.innerText && elements.rcaReportBody.innerText.trim() !== '');
+
+    if (!hasReportContent && elements.rcaReportBody) {
+        elements.rcaReportBody.innerHTML = `
+            <div style="text-align: center; padding: 40px 20px; color: var(--text-secondary);">
+                <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="margin-bottom: 12px; color: var(--primary); opacity: 0.85;">
+                    <rect x="4" y="4" width="16" height="16" rx="2" ry="2"></rect>
+                    <rect x="9" y="9" width="6" height="6"></rect>
+                    <line x1="9" y1="1" x2="9" y2="4"></line>
+                    <line x1="15" y1="1" x2="15" y2="4"></line>
+                    <line x1="9" y1="20" x2="9" y2="23"></line>
+                    <line x1="15" y1="20" x2="15" y2="23"></line>
+                    <line x1="20" y1="9" x2="23" y2="9"></line>
+                    <line x1="20" y1="15" x2="23" y2="15"></line>
+                    <line x1="1" y1="9" x2="4" y2="9"></line>
+                    <line x1="1" y1="15" x2="4" y2="15"></line>
+                </svg>
+                <h4 style="margin: 0 0 8px 0; color: var(--text-main); font-weight: 600;">AI Root Cause Analysis & Diagnostic Report</h4>
+                <p style="margin: 0; font-size: 0.9rem; max-width: 480px; margin: 0 auto; line-height: 1.5;">
+                    Select an analysis scope above (Fleet-Wide or specific log file) and click <strong style="color: var(--primary);">Start Analysis</strong> to synthesize DTC trends and generate an AI diagnostic report.
+                </p>
+                <div style="margin-top: 14px; font-size: 0.8rem; background: rgba(59,130,246,0.08); border: 1px solid rgba(59,130,246,0.2); color: var(--primary); padding: 8px 14px; border-radius: 6px; display: inline-block;">
+                    💡 <strong>Note:</strong> Select a file from the scope selector dropdown and click <strong>Start Analysis</strong>.
+                </div>
+            </div>
+        `;
     }
 }
 
@@ -2307,19 +2439,19 @@ function fetchRcaFiles() {
         .then(res => res.json())
         .then(data => {
             if (data.status === 'success' && elements.rcaScopeSelect) {
-                const fleetOption = elements.rcaScopeSelect.options[0];
-                const currentValue = elements.rcaScopeSelect.value;
-                elements.rcaScopeSelect.innerHTML = '';
-                elements.rcaScopeSelect.appendChild(fleetOption);
+                const currentValue = elements.rcaScopeSelect.value || 'fleet';
+                elements.rcaScopeSelect.innerHTML = '<option value="fleet">Fleet-Wide Analysis</option>';
                 
-                data.files.forEach(file => {
-                    if (file) {
-                        const opt = document.createElement('option');
-                        opt.value = file;
-                        opt.textContent = `File: ${file}`;
-                        elements.rcaScopeSelect.appendChild(opt);
-                    }
-                });
+                if (Array.isArray(data.files)) {
+                    data.files.forEach(file => {
+                        if (file) {
+                            const opt = document.createElement('option');
+                            opt.value = file;
+                            opt.textContent = `File: ${file}`;
+                            elements.rcaScopeSelect.appendChild(opt);
+                        }
+                    });
+                }
                 elements.rcaScopeSelect.value = currentValue;
             }
         })
@@ -2338,6 +2470,11 @@ function runAiRcaAnalysis() {
     if (elements.rcaChartsContainer) elements.rcaChartsContainer.innerHTML = '';
     if (elements.btnDownloadRca) elements.btnDownloadRca.classList.add('hidden');
 
+    if (elements.btnStartRca) {
+        elements.btnStartRca.disabled = true;
+        elements.btnStartRca.innerHTML = `<span class="css-spinner" style="width:12px;height:12px;border-width:2px;display:inline-block;margin-right:4px;"></span> Analyzing...`;
+    }
+
     const scope = elements.rcaScopeSelect ? elements.rcaScopeSelect.value : 'fleet';
     const endpoint = scope === 'fleet' ? '/api/ai/rca' : `/api/ai/rca/file/${encodeURIComponent(scope)}`;
     
@@ -2351,17 +2488,36 @@ function runAiRcaAnalysis() {
     .then(res => res.json())
     .then(data => {
         rcaAbortController = null;
+        if (elements.btnStartRca) {
+            elements.btnStartRca.disabled = false;
+            elements.btnStartRca.innerHTML = `Start Analysis`;
+        }
         if (elements.rcaLoading) elements.rcaLoading.classList.add('hidden');
         if (data.status === 'success' && elements.rcaReportBody) {
             appState.lastRcaMarkdown = data.report_markdown || '';
-            elements.rcaReportBody.innerHTML = renderMarkdownSimple(data.report_markdown);
+            const scopeLabel = scope === 'fleet' ? 'Fleet-Wide Analysis' : `File: ${scope}`;
+            const timestamp = new Date().toLocaleString();
+            const headerBanner = `
+                <div style="background: var(--bg-surface); border: 1px solid var(--border-color); border-radius: 8px; padding: 14px 18px; margin-bottom: 20px; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px;">
+                    <div style="display: flex; align-items: center; gap: 10px;">
+                        <span style="background: rgba(59,130,246,0.12); color: #3b82f6; padding: 4px 10px; border-radius: 4px; font-size: 0.78rem; font-weight: 600; letter-spacing: 0.3px;">RCA REPORT</span>
+                        <span style="font-size: 0.88rem; color: var(--text-main); font-weight: 500;">${scopeLabel}</span>
+                    </div>
+                    <div style="font-size: 0.78rem; color: var(--text-muted); display: flex; align-items: center; gap: 6px;">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+                        Generated ${timestamp}
+                    </div>
+                </div>
+            `;
+            elements.rcaReportBody.innerHTML = headerBanner + renderMarkdownSimple(data.report_markdown);
             if (elements.btnDownloadRca && data.report_markdown) {
                 elements.btnDownloadRca.classList.remove('hidden');
             }
             if (data.chart_data && elements.rcaChartsContainer && typeof Chart !== 'undefined') {
                 Object.entries(data.chart_data).forEach(([chartId, config]) => {
                     const canvasWrapper = document.createElement('div');
-                    canvasWrapper.style = "background: var(--bg-surface); padding: 12px; border-radius: 8px; border: 1px solid var(--border-color); position: relative; height: 350px; width: 100%;";
+                    canvasWrapper.className = 'chart-wrapper';
+                    canvasWrapper.style.cssText = "background: var(--bg-surface); padding: 16px; border-radius: 10px; border: 1px solid var(--border-color); position: relative; height: 350px; width: 100%; margin-bottom: 20px; page-break-inside: avoid !important; break-inside: avoid !important;";
                     const canvas = document.createElement('canvas');
                     canvasWrapper.appendChild(canvas);
                     elements.rcaChartsContainer.appendChild(canvasWrapper);
@@ -2377,6 +2533,10 @@ function runAiRcaAnalysis() {
         }
     })
     .catch(err => {
+        if (elements.btnStartRca) {
+            elements.btnStartRca.disabled = false;
+            elements.btnStartRca.innerHTML = `Start Analysis`;
+        }
         if (err.name === 'AbortError') {
             console.log('RCA generation stopped by user.');
             return;
@@ -2391,22 +2551,93 @@ function runAiRcaAnalysis() {
 }
 
 function downloadRcaReport() {
-    if (!appState.lastRcaMarkdown) {
+    if (!appState.lastRcaMarkdown && (!elements.rcaReportBody || !elements.rcaReportBody.innerText.trim())) {
         showToast("No RCA report content available to download.", "warning");
         return;
     }
+
+    showToast("📄 Generating PDF report...", "info");
+
+    const modalBody = document.querySelector('#rca-modal .rca-modal-body');
+    if (!modalBody) {
+        showToast("Unable to find RCA report content.", "error");
+        return;
+    }
+
+    const scope = elements.rcaScopeSelect ? elements.rcaScopeSelect.value : 'fleet';
     const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
-    const filename = `AI_RCA_Diagnostic_Report_${timestamp}.md`;
-    const blob = new Blob([appState.lastRcaMarkdown], { type: 'text/markdown;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = filename;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(url);
-    showToast(`Downloaded RCA Report (${filename})`);
+    const filename = `DiagTrace_AI_RCA_Report_${scope}_${timestamp}.pdf`;
+
+    const originalMaxHeight = modalBody.style.maxHeight;
+    const originalOverflow = modalBody.style.overflowY;
+    const originalColor = modalBody.style.color;
+
+    modalBody.style.maxHeight = 'none';
+    modalBody.style.overflowY = 'visible';
+    modalBody.style.color = 'var(--text-main, #0f172a)';
+
+    const chartsContainer = elements.rcaChartsContainer;
+    let originalChartsDisplay = '';
+    if (chartsContainer) {
+        originalChartsDisplay = chartsContainer.style.display;
+        chartsContainer.style.display = 'block';
+    }
+
+    const opt = {
+        margin:       [12, 12, 12, 12],
+        filename:     filename,
+        image:        { type: 'jpeg', quality: 0.98 },
+        html2canvas:  { scale: 2, useCORS: true, logging: false, backgroundColor: '#ffffff' },
+        jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' },
+        pagebreak:    { mode: ['avoid-all', 'css', 'legacy'], avoid: ['.chart-wrapper', 'table', 'tr', 'h1', 'h2', 'h3', 'code', 'ul'] }
+    };
+
+    const pdfStyles = document.createElement('style');
+    pdfStyles.id = 'pdf-export-styles-rca';
+    pdfStyles.innerHTML = `
+        #rca-modal code, .markdown-body code {
+            background: #f1f5f9 !important;
+            color: #0f172a !important;
+            border: 1px solid #cbd5e1 !important;
+            font-weight: 600 !important;
+            padding: 2px 6px !important;
+            display: inline-block !important;
+        }
+        #rca-modal .rca-modal-body, .markdown-body {
+            color: #0f172a !important;
+        }
+        #rca-modal th, .markdown-body th {
+            background: #f8fafc !important;
+            color: #0f172a !important;
+        }
+        #rca-modal td, .markdown-body td {
+            color: #1e293b !important;
+        }
+    `;
+    document.head.appendChild(pdfStyles);
+
+    const cleanupPdfStyles = () => {
+        const el = document.getElementById('pdf-export-styles-rca');
+        if (el) el.remove();
+        modalBody.style.maxHeight = originalMaxHeight;
+        modalBody.style.overflowY = originalOverflow;
+        modalBody.style.color = originalColor;
+        if (chartsContainer) chartsContainer.style.display = originalChartsDisplay;
+    };
+
+    if (typeof html2pdf !== 'undefined') {
+        html2pdf().set(opt).from(modalBody).save().then(() => {
+            cleanupPdfStyles();
+            showToast(`🎉 Downloaded PDF Report (${filename})`);
+        }).catch(err => {
+            console.error("PDF generation error:", err);
+            cleanupPdfStyles();
+            showToast("Failed to generate PDF report.", "error");
+        });
+    } else {
+        window.print();
+        cleanupPdfStyles();
+    }
 }
 
 function closeRcaModal() {
@@ -2536,20 +2767,84 @@ function renderDynamicChatChart(canvasId, spec) {
 }
 
 function renderMarkdownSimple(text) {
-    if (!text) return '';
+    if (!text) return '<p style="color: var(--text-muted);">No content available.</p>';
     let html = text
         .replace(/&/g, "&amp;")
         .replace(/</g, "&lt;")
-        .replace(/>/g, "&gt;")
-        .replace(/^### (.*$)/gim, '<h3>$1</h3>')
-        .replace(/^## (.*$)/gim, '<h2>$1</h2>')
-        .replace(/^# (.*$)/gim, '<h1>$1</h1>')
-        .replace(/\*\*(.*?)\*\*/g, '<b>$1</b>')
-        .replace(/\*(.*?)\*/g, '<i>$1</i>')
-        .replace(/`([^`]+)`/g, '<code>$1</code>')
-        .replace(/\n\n/g, '<br/><br/>')
-        .replace(/\n/g, '<br/>');
-    return html;
+        .replace(/>/g, "&gt;");
+        
+    let lines = html.split('\n');
+    let inTable = false;
+    let newLines = [];
+    
+    for (let i = 0; i < lines.length; i++) {
+        let line = lines[i].trim();
+        if (line.startsWith('|') && line.endsWith('|')) {
+            if (!inTable) {
+                inTable = true;
+                newLines.push('<div style="overflow-x: auto; margin: 16px 0;"><table style="width: 100%; border-collapse: collapse; font-size: 0.88rem; text-align: left; border: 1px solid var(--border-color, #e2e8f0); border-radius: 8px; overflow: hidden;">');
+            }
+            if (line.match(/^\|[\s\-\|:]+\|$/)) continue;
+            
+            let cells = line.split('|').slice(1, -1);
+            let rowHtml = '<tr style="border-bottom: 1px solid var(--border-color, #e2e8f0);">';
+            for (let cell of cells) {
+                let isHeader = (i + 1 < lines.length) && lines[i+1].trim().match(/^\|[\s\-\|:]+\|$/);
+                let tag = isHeader ? 'th' : 'td';
+                let style = isHeader 
+                    ? 'padding: 10px 14px; background: var(--bg-surface, rgba(0,0,0,0.03)); font-weight: 600; color: var(--text-main, #0f172a); border-right: 1px solid var(--border-color, #e2e8f0);' 
+                    : 'padding: 10px 14px; color: var(--text-main, #334155); border-right: 1px solid var(--border-color, #e2e8f0);';
+                
+                let cellHtml = cell.trim()
+                    .replace(/\*\*\*(.*?)\*\*\*/g, '<strong><em>$1</em></strong>')
+                    .replace(/\*\*(.*?)\*\*/g, '<b>$1</b>')
+                    .replace(/\*(.*?)\*/g, '<i>$1</i>')
+                    .replace(/`([^`]+)`/g, '<code style="background: rgba(0,0,0,0.06); padding: 2px 5px; border-radius: 4px; font-family: var(--font-mono); font-size: 0.82rem;">$1</code>');
+                rowHtml += `<${tag} style="${style}">${cellHtml}</${tag}>`;
+            }
+            rowHtml += '</tr>';
+            newLines.push(rowHtml);
+        } else {
+            if (inTable) {
+                inTable = false;
+                newLines.push('</table></div>');
+            }
+            let formattedLine = line
+                .replace(/^### (.*$)/gim, '<h3 style="margin-top: 18px; margin-bottom: 8px; font-size: 1.05rem; font-weight: 600; color: var(--text-main, #0f172a);">$1</h3>')
+                .replace(/^## (.*$)/gim, '<h2 style="margin-top: 22px; margin-bottom: 10px; font-size: 1.2rem; font-weight: 600; color: var(--primary, #2563eb); border-bottom: 1px solid var(--border-color, #e2e8f0); padding-bottom: 6px;">$1</h2>')
+                .replace(/^# (.*$)/gim, '<h1 style="margin-top: 24px; margin-bottom: 14px; font-size: 1.4rem; font-weight: 700; color: var(--text-main, #0f172a); border-bottom: 2px solid var(--primary, #2563eb); padding-bottom: 8px;">$1</h1>')
+                .replace(/\*\*\*(.*?)\*\*\*/g, '<strong><em>$1</em></strong>')
+                .replace(/\*\*(.*?)\*\*/g, '<b>$1</b>')
+                .replace(/\*(.*?)\*/g, '<i>$1</i>')
+                .replace(/`([^`]+)`/g, '<code style="background: rgba(0,0,0,0.06); padding: 2px 5px; border-radius: 4px; font-family: var(--font-mono); font-size: 0.85rem;">$1</code>')
+                .replace(/^[-*]\s+(.+)$/gim, '<li>$1</li>')
+                .replace(/^\d+\.\s+(.+)$/gim, '<li>$1</li>')
+                .replace(/^---$/gm, '<hr style="border: none; border-top: 1px solid var(--border-color, #e2e8f0); margin: 20px 0;">');
+            newLines.push(formattedLine);
+        }
+    }
+    if (inTable) newLines.push('</table></div>');
+    
+    html = newLines.join('\n');
+    html = html.replace(/(<\/table><\/div>|<\/h[1-3]>)[\s\n]+/g, '$1\n');
+    
+    // Group <li> into <ul>
+    html = html.replace(/(<li>.*?<\/li>(\s*\n)?)+/gs, (match) => {
+        return '<ul style="padding-left: 22px; margin: 10px 0; line-height: 1.6;">' + match.replace(/\n/g, '') + '</ul>';
+    });
+
+    html = html.replace(/\n\n/g, '<br/><br/>').replace(/\n/g, '<br/>');
+    
+    html = html.replace(/<br\/>(<div style="overflow-x)/g, '$1')
+               .replace(/(<\/div>)<br\/>/g, '$1')
+               .replace(/(<tr.*?>)<br\/>/g, '$1')
+               .replace(/(<\/tr>)<br\/>/g, '$1')
+               .replace(/(<ul.*?>)<br\/>/g, '$1')
+               .replace(/(<\/ul>)<br\/>/g, '$1')
+               .replace(/(<h[1-3].*?>)<br\/>/g, '$1')
+               .replace(/(<\/h[1-3]>)<br\/>/g, '$1');
+    
+    return `<div class="markdown-body" style="line-height: 1.7; font-size: 0.92rem; color: var(--text-main, #334155);">${html}</div>`;
 }
 
 // ----------------------------------------------------
@@ -2723,22 +3018,58 @@ function updateAiAnalysisCellLive(rowIndex, reportMarkdown) {
 }
 
 function downloadLogAnalysisReport() {
-    if (!appState.lastLogAnalysisMarkdown) {
+    if (!appState.lastLogAnalysisMarkdown && (!elementsLogAnalysis.reportBody || !elementsLogAnalysis.reportBody.innerText.trim())) {
         showToast("No analysis report content available to download.", "warning");
         return;
     }
+
+    showToast("📄 Generating PDF report...", "info");
+
+    const modalBody = document.querySelector('#log-analysis-modal .rca-modal-body');
+    if (!modalBody) {
+        showToast("Unable to find log analysis report content.", "error");
+        return;
+    }
+
     const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
-    const filename = `AI_Log_Analysis_Report_${timestamp}.md`;
-    const blob = new Blob([appState.lastLogAnalysisMarkdown], { type: 'text/markdown;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = filename;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(url);
-    showToast(`Downloaded Log Analysis Report (${filename})`);
+    const filename = `DiagTrace_Log_Analysis_Report_${timestamp}.pdf`;
+
+    const originalMaxHeight = modalBody.style.maxHeight;
+    const originalOverflow = modalBody.style.overflowY;
+    const originalColor = modalBody.style.color;
+
+    modalBody.style.maxHeight = 'none';
+    modalBody.style.overflowY = 'visible';
+    modalBody.style.color = 'var(--text-main, #0f172a)';
+
+    const opt = {
+        margin:       [12, 12, 12, 12],
+        filename:     filename,
+        image:        { type: 'jpeg', quality: 0.98 },
+        html2canvas:  { scale: 2, useCORS: true, logging: false, backgroundColor: '#ffffff' },
+        jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' },
+        pagebreak:    { mode: ['avoid-all', 'css', 'legacy'], avoid: ['table', 'tr', 'h1', 'h2', 'h3', 'code', 'ul'] }
+    };
+
+    if (typeof html2pdf !== 'undefined') {
+        html2pdf().set(opt).from(modalBody).save().then(() => {
+            modalBody.style.maxHeight = originalMaxHeight;
+            modalBody.style.overflowY = originalOverflow;
+            modalBody.style.color = originalColor;
+            showToast(`🎉 Downloaded Log Analysis PDF (${filename})`);
+        }).catch(err => {
+            console.error("PDF generation error:", err);
+            modalBody.style.maxHeight = originalMaxHeight;
+            modalBody.style.overflowY = originalOverflow;
+            modalBody.style.color = originalColor;
+            showToast("Failed to generate PDF report.", "error");
+        });
+    } else {
+        window.print();
+        modalBody.style.maxHeight = originalMaxHeight;
+        modalBody.style.overflowY = originalOverflow;
+        modalBody.style.color = originalColor;
+    }
 }
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -2786,5 +3117,4 @@ document.addEventListener('DOMContentLoaded', () => {
         elementsLogAnalysis.btnDownload.addEventListener('click', downloadLogAnalysisReport);
     }
 });
-
 
