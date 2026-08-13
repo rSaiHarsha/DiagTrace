@@ -2743,16 +2743,20 @@ body.dark-mode .markdown-body code {
 /* =========================================================
    AI RCA MODAL - TOP LEFT WINDOW CONTROLS
    ========================================================= */
+/* =========================================================
+   AI RCA MODAL - TOP RIGHT WINDOW CONTROLS
+   ========================================================= */
 
 #rca-modal .rca-modal-content {
     position: relative;
 }
 
-/* Move Dock button to top-left */
+/* Dock button - top right */
 #rca-modal #btn-dock-rca {
     position: absolute;
     top: 12px;
-    left: 16px;
+    right: 58px;
+    left: auto;
     z-index: 20;
 
     padding: 5px 10px;
@@ -2767,11 +2771,12 @@ body.dark-mode .markdown-body code {
     border-radius: 6px;
 }
 
-/* Move Close button to top-left, beside Dock */
+/* Close button - top right */
 #rca-modal #rca-close {
     position: absolute;
     top: 12px;
-    left: 78px;
+    right: 16px;
+    left: auto;
     z-index: 20;
 
     width: 30px;
@@ -2801,9 +2806,8 @@ body.dark-mode .markdown-body code {
     color: var(--error);
 }
 
-/* Give the RCA title enough room so controls don't overlap */
+/* Keep title from overlapping the controls */
 #rca-modal .modal-header {
     position: relative;
-    padding-left: 145px;
+    padding-right: 170px;
 }
-
