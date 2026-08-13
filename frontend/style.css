@@ -2739,3 +2739,71 @@ body.dark-mode .markdown-body code {
         break-inside: avoid-page !important;
     }
 }
+
+/* =========================================================
+   AI RCA MODAL - TOP LEFT WINDOW CONTROLS
+   ========================================================= */
+
+#rca-modal .rca-modal-content {
+    position: relative;
+}
+
+/* Move Dock button to top-left */
+#rca-modal #btn-dock-rca {
+    position: absolute;
+    top: 12px;
+    left: 16px;
+    z-index: 20;
+
+    padding: 5px 10px;
+    height: 30px;
+
+    display: flex;
+    align-items: center;
+    gap: 5px;
+
+    background: var(--bg-main);
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+}
+
+/* Move Close button to top-left, beside Dock */
+#rca-modal #rca-close {
+    position: absolute;
+    top: 12px;
+    left: 78px;
+    z-index: 20;
+
+    width: 30px;
+    height: 30px;
+
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+    font-size: 24px;
+    line-height: 1;
+
+    border-radius: 6px;
+    color: var(--text-secondary);
+    cursor: pointer;
+}
+
+/* Hover effects */
+#rca-modal #btn-dock-rca:hover {
+    background: var(--bg-card-hover);
+    color: var(--primary);
+    border-color: var(--primary);
+}
+
+#rca-modal #rca-close:hover {
+    background: rgba(225, 29, 72, 0.1);
+    color: var(--error);
+}
+
+/* Give the RCA title enough room so controls don't overlap */
+#rca-modal .modal-header {
+    position: relative;
+    padding-left: 145px;
+}
+
