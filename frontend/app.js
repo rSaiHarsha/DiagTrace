@@ -1372,6 +1372,7 @@ function buildHeaderFiltersMarkup() {
                 const uniqueVals = [...new Set(appState.allData.map(item => item[col]).filter(v => v !== null && v !== undefined && v !== ''))].sort((a, b) => String(a).localeCompare(String(b)));
                 const safeCol = col.replace(/[^a-zA-Z0-9_-]/g, '_');
                 const selectedForCol = (Array.isArray(appState.filters[col]) ? appState.filters[col] : []).map(String);
+                const isAllChecked = (uniqueVals.length > 0 && selectedForCol.length === uniqueVals.length);
                 
                 let checkboxesHtml = uniqueVals.map(val => {
                     const strVal = String(val);
@@ -1389,10 +1390,15 @@ function buildHeaderFiltersMarkup() {
                         <div class="chk-dropdown-panel hidden">
                             <input type="text" class="chk-dropdown-search" placeholder="Search..." />
                             <div class="chk-options-list">
+                                <label class="chk-filter-label chk-filter-all" style="font-weight: 600; border-bottom: 1px solid var(--border-color); padding-bottom: 4px; margin-bottom: 4px;">
+                                    <input type="checkbox" class="chk-select-all-option" data-col="${col}" ${isAllChecked ? 'checked' : ''}>
+                                    <span class="chk-filter-text">Select All</span>
+                                </label>
                                 ${checkboxesHtml}
                             </div>
-                            <div class="chk-footer">
-                                <button type="button" class="chk-clear-btn" data-col="${col}">Clear</button>
+                            <div class="chk-footer" style="display: flex; justify-content: space-between; align-items: center; padding: 4px 8px; border-top: 1px solid var(--border-color); background: rgba(0,0,0,0.02);">
+                                <button type="button" class="chk-select-all-btn" data-col="${col}" style="background: none; border: none; color: var(--primary); font-size: 0.7rem; cursor: pointer; font-weight: 500;">Select All</button>
+                                <button type="button" class="chk-clear-btn" data-col="${col}" style="background: none; border: none; color: var(--text-muted); font-size: 0.7rem; cursor: pointer;">Clear</button>
                             </div>
                         </div>
                     </div>
@@ -1439,18 +1445,36 @@ function bindCheckboxFilterEvents() {
             }
             return;
         }
-        // Clear button inside panel
+        // Select All button inside panel footer
+        const selectAllBtn = e.target.closest('.chk-select-all-btn');
+        if (selectAllBtn) {
+            const col = selectAllBtn.dataset.col;
+            const panel = selectAllBtn.closest('.chk-dropdown-panel');
+            if (panel) {
+                panel.querySelectorAll('.chk-filter-option').forEach(cb => { cb.checked = true; });
+                const selectAllCb = panel.querySelector('.chk-select-all-option');
+                if (selectAllCb) selectAllCb.checked = true;
+            }
+            collectCheckboxFilter(col);
+            appState.currentPage = 1;
+            applyFilters();
+            return;
+        }
+        // Clear button inside panel footer
         const clearBtn = e.target.closest('.chk-clear-btn');
         if (clearBtn) {
             const col = clearBtn.dataset.col;
             const panel = clearBtn.closest('.chk-dropdown-panel');
             if (panel) {
                 panel.querySelectorAll('.chk-filter-option').forEach(cb => { cb.checked = false; });
+                const selectAllCb = panel.querySelector('.chk-select-all-option');
+                if (selectAllCb) selectAllCb.checked = false;
             }
             appState.filters[col] = [];
             updateCheckboxTriggerLabel(col);
             appState.currentPage = 1;
             applyFilters();
+            return;
         }
     });
 
@@ -1463,6 +1487,19 @@ function bindCheckboxFilterEvents() {
 
     // Checkbox change → update filter
     elements.tableHeadersRow.addEventListener('change', (e) => {
+        // Select All checkbox toggle
+        if (e.target.classList.contains('chk-select-all-option')) {
+            const col = e.target.dataset.col;
+            const panel = e.target.closest('.chk-dropdown-panel');
+            if (panel) {
+                const isChecked = e.target.checked;
+                panel.querySelectorAll('.chk-filter-option').forEach(cb => { cb.checked = isChecked; });
+            }
+            collectCheckboxFilter(col);
+            appState.currentPage = 1;
+            applyFilters();
+            return;
+        }
         if (e.target.classList.contains('chk-filter-option')) {
             const col = e.target.dataset.col;
             collectCheckboxFilter(col);
@@ -1479,7 +1516,7 @@ function bindCheckboxFilterEvents() {
             if (panel) {
                 const list = panel.querySelector('.chk-options-list');
                 if (list) {
-                    list.querySelectorAll('.chk-filter-label').forEach(label => {
+                    list.querySelectorAll('.chk-filter-label:not(.chk-filter-all)').forEach(label => {
                         label.style.display = label.textContent.toLowerCase().includes(val) ? 'flex' : 'none';
                     });
                 }
@@ -1507,6 +1544,24 @@ function updateCheckboxTriggerLabel(col) {
     if (!dropdown) return;
     const trigger = dropdown.querySelector('.chk-dropdown-trigger');
     if (!trigger) return;
+    
+    // Update Select All checkbox state
+    const selectAllCb = dropdown.querySelector('.chk-select-all-option');
+    if (selectAllCb) {
+        const allCbs = dropdown.querySelectorAll('.chk-filter-option');
+        const checkedCbs = dropdown.querySelectorAll('.chk-filter-option:checked');
+        if (allCbs.length > 0 && checkedCbs.length === allCbs.length) {
+            selectAllCb.checked = true;
+            selectAllCb.indeterminate = false;
+        } else if (checkedCbs.length > 0) {
+            selectAllCb.checked = false;
+            selectAllCb.indeterminate = true;
+        } else {
+            selectAllCb.checked = false;
+            selectAllCb.indeterminate = false;
+        }
+    }
+
     const selected = appState.filters[col] || [];
     if (!Array.isArray(selected) || selected.length === 0) {
         trigger.textContent = 'All ▾';
