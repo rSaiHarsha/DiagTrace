@@ -1320,15 +1320,17 @@ function buildDynamicColumns() {
     
     appState.columns = columns;
     
-    // Re-initialize filters schema: arrays for checkbox multi-select, strings for text inputs
-    appState.filters = {};
+    // Initialize filters schema: preserve existing active filters, initialize new columns
+    if (!appState.filters) appState.filters = {};
     columns.forEach(col => {
-        appState.filters[col] = []; // empty array = no filter active
+        if (!appState.filters[col]) {
+            appState.filters[col] = []; // empty array = no filter active
+        }
     });
 }
 
 function getUniqueValuesCount(colName) {
-    return new Set(appState.allData.map(item => item[colName]).filter(Boolean)).size;
+    return new Set(appState.allData.map(item => item[colName]).filter(v => v !== null && v !== undefined && v !== '')).size;
 }
 
 function buildHeaderFiltersMarkup() {
@@ -1363,17 +1365,21 @@ function buildHeaderFiltersMarkup() {
             const isTextField = (col === "Description" || col === "Comments" || uniqueCount > 50);
             
             if (isTextField) {
-                filterControl = `<input type="text" data-col="${col}" class="header-filter-input" placeholder="Search..." />`;
+                const currentTextVal = typeof appState.filters[col] === 'string' ? appState.filters[col] : '';
+                filterControl = `<input type="text" data-col="${col}" class="header-filter-input" placeholder="Search..." value="${currentTextVal.replace(/"/g, '&quot;')}" />`;
             } else {
                 // Checkbox multi-select panel
-                const uniqueVals = [...new Set(appState.allData.map(item => item[col]).filter(v => v !== null && v !== undefined && v !== ''))].sort();
+                const uniqueVals = [...new Set(appState.allData.map(item => item[col]).filter(v => v !== null && v !== undefined && v !== ''))].sort((a, b) => String(a).localeCompare(String(b)));
                 const safeCol = col.replace(/[^a-zA-Z0-9_-]/g, '_');
+                const selectedForCol = (Array.isArray(appState.filters[col]) ? appState.filters[col] : []).map(String);
                 
                 let checkboxesHtml = uniqueVals.map(val => {
-                    const safeId = `chk_${safeCol}_${String(val).replace(/[^a-zA-Z0-9]/g, '_')}`;
-                    return `<label class="chk-filter-label" title="${val}">
-                        <input type="checkbox" class="chk-filter-option" data-col="${col}" data-value="${val}" id="${safeId}">
-                        <span class="chk-filter-text">${val}</span>
+                    const strVal = String(val);
+                    const isChecked = selectedForCol.includes(strVal) ? 'checked' : '';
+                    const safeId = `chk_${safeCol}_${strVal.replace(/[^a-zA-Z0-9]/g, '_')}`;
+                    return `<label class="chk-filter-label" title="${strVal.replace(/"/g, '&quot;')}">
+                        <input type="checkbox" class="chk-filter-option" data-col="${col}" data-value="${strVal.replace(/"/g, '&quot;')}" id="${safeId}" ${isChecked}>
+                        <span class="chk-filter-text">${strVal}</span>
                     </label>`;
                 }).join('');
                 
@@ -1402,22 +1408,35 @@ function buildHeaderFiltersMarkup() {
         elements.tableHeadersRow.appendChild(th);
     });
 
-    // ── Bind checkbox filter events after DOM injection ──
+    // Update triggers based on current filter state
+    appState.columns.forEach(col => {
+        updateCheckboxTriggerLabel(col);
+    });
+
+    // ── Bind checkbox filter events ONCE after DOM injection ──
     bindCheckboxFilterEvents();
 }
 
-/** Bind all checkbox-filter interactions after DOM is built */
+let isCheckboxFilterEventsBound = false;
+
+/** Bind all checkbox-filter interactions ONCE */
 function bindCheckboxFilterEvents() {
+    if (isCheckboxFilterEventsBound) return;
+    isCheckboxFilterEventsBound = true;
+
     // Open/close panel on trigger click
     elements.tableHeadersRow.addEventListener('click', (e) => {
         const trigger = e.target.closest('.chk-dropdown-trigger');
         if (trigger) {
             e.stopPropagation();
             const panel = trigger.nextElementSibling;
-            const isOpen = !panel.classList.contains('hidden');
+            if (!panel) return;
+            const isHidden = panel.classList.contains('hidden');
             // Close all other panels first
             document.querySelectorAll('.chk-dropdown-panel').forEach(p => p.classList.add('hidden'));
-            if (!isOpen) panel.classList.remove('hidden');
+            if (isHidden) {
+                panel.classList.remove('hidden');
+            }
             return;
         }
         // Clear button inside panel
@@ -1425,7 +1444,9 @@ function bindCheckboxFilterEvents() {
         if (clearBtn) {
             const col = clearBtn.dataset.col;
             const panel = clearBtn.closest('.chk-dropdown-panel');
-            panel.querySelectorAll('.chk-filter-option').forEach(cb => { cb.checked = false; });
+            if (panel) {
+                panel.querySelectorAll('.chk-filter-option').forEach(cb => { cb.checked = false; });
+            }
             appState.filters[col] = [];
             updateCheckboxTriggerLabel(col);
             appState.currentPage = 1;
@@ -1454,27 +1475,40 @@ function bindCheckboxFilterEvents() {
     elements.tableHeadersRow.addEventListener('input', (e) => {
         if (e.target.classList.contains('chk-dropdown-search')) {
             const val = e.target.value.toLowerCase();
-            const list = e.target.closest('.chk-dropdown-panel').querySelector('.chk-options-list');
-            list.querySelectorAll('.chk-filter-label').forEach(label => {
-                label.style.display = label.textContent.toLowerCase().includes(val) ? 'flex' : 'none';
-            });
+            const panel = e.target.closest('.chk-dropdown-panel');
+            if (panel) {
+                const list = panel.querySelector('.chk-options-list');
+                if (list) {
+                    list.querySelectorAll('.chk-filter-label').forEach(label => {
+                        label.style.display = label.textContent.toLowerCase().includes(val) ? 'flex' : 'none';
+                    });
+                }
+            }
         }
     });
 }
 
 function collectCheckboxFilter(col) {
-    const checked = elements.tableHeadersRow.querySelectorAll(`.chk-filter-option[data-col="${CSS.escape(col)}"]:checked`);
+    let dropdown = null;
+    elements.tableHeadersRow.querySelectorAll('.chk-dropdown').forEach(d => {
+        if (d.dataset.col === col) dropdown = d;
+    });
+    if (!dropdown) return;
+    const checked = dropdown.querySelectorAll('.chk-filter-option:checked');
     appState.filters[col] = Array.from(checked).map(cb => cb.dataset.value);
     updateCheckboxTriggerLabel(col);
 }
 
 function updateCheckboxTriggerLabel(col) {
-    const dropdown = elements.tableHeadersRow.querySelector(`.chk-dropdown[data-col="${CSS.escape(col)}"]`);
+    let dropdown = null;
+    elements.tableHeadersRow.querySelectorAll('.chk-dropdown').forEach(d => {
+        if (d.dataset.col === col) dropdown = d;
+    });
     if (!dropdown) return;
     const trigger = dropdown.querySelector('.chk-dropdown-trigger');
     if (!trigger) return;
     const selected = appState.filters[col] || [];
-    if (selected.length === 0) {
+    if (!Array.isArray(selected) || selected.length === 0) {
         trigger.textContent = 'All ▾';
         trigger.classList.remove('chk-active');
     } else {
@@ -1484,21 +1518,7 @@ function updateCheckboxTriggerLabel(col) {
 }
 
 function handleFilterChange() {
-    // Collect active values from all dynamic header filter controls
-    appState.columns.forEach(col => {
-        if (col === "Last Updated" || col === "AI Analysis") return;
-        
-        const uniqueCount = getUniqueValuesCount(col);
-        const isTextField = (col === "Description" || col === "Comments" || uniqueCount > 50);
-        
-        if (isTextField) {
-            const control = elements.tableHeadersRow.querySelector(`input.header-filter-input[data-col]`);
-            // Let inline input handler deal with it — collectCheckboxFilter handles checkbox cols
-        }
-        // checkbox cols are handled by their own listener (bindCheckboxFilterEvents)
-    });
-    
-    // Also pick up any text inputs via the generic path
+    // Collect active values from text inputs
     elements.tableHeadersRow.querySelectorAll('.header-filter-input').forEach(input => {
         const col = input.dataset.col;
         if (col) appState.filters[col] = input.value;
@@ -1521,14 +1541,14 @@ function applyFilters() {
             
             if (isTextField) {
                 // String filter
-                if (!filterVal) continue;
+                if (!filterVal || (typeof filterVal === 'string' && filterVal.trim() === '')) continue;
                 if (!cellVal.toLowerCase().includes(String(filterVal).toLowerCase().trim())) {
                     return false;
                 }
             } else {
                 // Array filter (multi-select checkboxes) — OR logic
                 if (!filterVal || (Array.isArray(filterVal) && filterVal.length === 0)) continue;
-                const selected = Array.isArray(filterVal) ? filterVal : [filterVal];
+                const selected = Array.isArray(filterVal) ? filterVal.map(String) : [String(filterVal)];
                 if (!selected.includes(cellVal)) {
                     return false;
                 }
