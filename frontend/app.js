@@ -16,6 +16,16 @@ let appState = {
     lastRcaMarkdown: ""
 };
 
+function escapeHtml(str) {
+    if (str === null || str === undefined) return '';
+    return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+}
+
 // Global Chart.js Instances
 let charts = {
     topDtc: null,
@@ -24,6 +34,11 @@ let charts = {
     programDist: null
 };
 let topDtcDialogChart = null;
+
+// Chat Session ID — unique per page load for conversation memory
+let chatSessionId = (typeof crypto !== 'undefined' && crypto.randomUUID) 
+    ? crypto.randomUUID() 
+    : 'session-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9);
 
 // DOM Elements Cache
 const elements = {
@@ -181,6 +196,9 @@ const elements = {
     chatWidgetToggle: document.getElementById('chat-widget-toggle'),
     chatDrawer: document.getElementById('chat-drawer'),
     chatDrawerClose: document.getElementById('chat-drawer-close'),
+    chatDrawerExpand: document.getElementById('chat-drawer-expand'),
+    chatModalBackdrop: document.getElementById('chat-modal-backdrop'),
+    chatNewChat: document.getElementById('chat-new-chat'),
     chatHistory: document.getElementById('chat-history'),
     chatForm: document.getElementById('chat-form'),
     chatInput: document.getElementById('chat-input'),
@@ -298,6 +316,8 @@ function setupEventListeners() {
     // AI Chatbot Widget Controls
     if (elements.chatWidgetToggle) elements.chatWidgetToggle.addEventListener('click', toggleChatDrawer);
     if (elements.chatDrawerClose) elements.chatDrawerClose.addEventListener('click', closeChatDrawer);
+    if (elements.chatDrawerExpand) elements.chatDrawerExpand.addEventListener('click', toggleExpandChatDrawer);
+    if (elements.chatNewChat) elements.chatNewChat.addEventListener('click', newChatSession);
     if (elements.chatForm) elements.chatForm.addEventListener('submit', handleChatSubmit);
     
     document.querySelectorAll('.chip-btn').forEach(btn => {
@@ -309,6 +329,9 @@ function setupEventListeners() {
             }
         });
     });
+    
+    // Load initial chat sessions
+    loadChatSessions();
     
     if (elements.profileClose) elements.profileClose.addEventListener('click', closeProfileModal);
     if (elements.settingsClose) elements.settingsClose.addEventListener('click', closeSettingsModal);
@@ -2725,12 +2748,95 @@ function closeRcaModal() {
 function toggleChatDrawer() {
     if (elements.chatDrawer) {
         elements.chatDrawer.classList.toggle('hidden');
+        if (elements.chatDrawer.classList.contains('hidden')) {
+            closeExpandChatDrawer();
+        }
     }
 }
 
 function closeChatDrawer() {
     if (elements.chatDrawer) {
         elements.chatDrawer.classList.add('hidden');
+        closeExpandChatDrawer();
+    }
+}
+
+function toggleExpandChatDrawer() {
+    if (!elements.chatDrawer) return;
+    
+    // Ensure drawer is open
+    elements.chatDrawer.classList.remove('hidden');
+
+    const isExpanded = elements.chatDrawer.classList.toggle('expanded');
+    const widget = document.getElementById('ai-chatbot-widget');
+    if (widget) {
+        widget.classList.toggle('expanded-widget', isExpanded);
+    }
+    
+    // Manage Backdrop
+    let backdrop = elements.chatModalBackdrop || document.getElementById('chat-modal-backdrop');
+    if (!backdrop) {
+        backdrop = document.createElement('div');
+        backdrop.id = 'chat-modal-backdrop';
+        backdrop.className = 'chat-modal-backdrop';
+        document.body.appendChild(backdrop);
+        elements.chatModalBackdrop = backdrop;
+        backdrop.addEventListener('click', closeExpandChatDrawer);
+    }
+    
+    if (isExpanded) {
+        backdrop.classList.add('active');
+        document.body.style.overflow = 'hidden';
+    } else {
+        backdrop.classList.remove('active');
+        document.body.style.overflow = '';
+    }
+
+    updateExpandBtnState(isExpanded);
+}
+
+function closeExpandChatDrawer() {
+    if (elements.chatDrawer) {
+        elements.chatDrawer.classList.remove('expanded');
+    }
+    const widget = document.getElementById('ai-chatbot-widget');
+    if (widget) {
+        widget.classList.remove('expanded-widget');
+    }
+    const backdrop = elements.chatModalBackdrop || document.getElementById('chat-modal-backdrop');
+    if (backdrop) {
+        backdrop.classList.remove('active');
+    }
+    document.body.style.overflow = '';
+    updateExpandBtnState(false);
+}
+
+function updateExpandBtnState(isExpanded) {
+    const expandBtn = elements.chatDrawerExpand || document.getElementById('chat-drawer-expand');
+    if (!expandBtn) return;
+
+    if (isExpanded) {
+        expandBtn.innerHTML = `
+            <svg fill="none" height="14" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewBox="0 0 24 24" width="14">
+                <polyline points="4 14 10 14 10 20"></polyline>
+                <polyline points="20 10 14 10 14 4"></polyline>
+                <line x1="14" y1="10" x2="21" y2="3"></line>
+                <line x1="10" y1="14" x2="3" y2="21"></line>
+            </svg>
+            <span class="expand-text">Compress</span>
+        `;
+        expandBtn.title = "Collapse Assistant Dialog";
+    } else {
+        expandBtn.innerHTML = `
+            <svg fill="none" height="14" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewBox="0 0 24 24" width="14">
+                <polyline points="15 3 21 3 21 9"></polyline>
+                <polyline points="9 21 3 21 3 15"></polyline>
+                <line x1="21" y1="3" x2="14" y2="10"></line>
+                <line x1="3" y1="21" x2="10" y2="14"></line>
+            </svg>
+            <span class="expand-text">Expand</span>
+        `;
+        expandBtn.title = "Expand Assistant Dialog";
     }
 }
 
@@ -2753,7 +2859,7 @@ function handleChatSubmit(e) {
     fetch('/api/ai/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: message })
+        body: JSON.stringify({ message: message, session_id: chatSessionId })
     })
     .then(res => res.json())
     .then(data => {
@@ -2784,6 +2890,151 @@ function handleChatSubmit(e) {
             botMsgEl.querySelector('.msg-bubble').innerHTML = `<span style="color:var(--error);">Failed to get AI response: ${err.message}</span>`;
         }
     });
+}
+
+function newChatSession() {
+    // Generate new session ID
+    chatSessionId = (typeof crypto !== 'undefined' && crypto.randomUUID) 
+        ? crypto.randomUUID() 
+        : 'session-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9);
+
+    // Clear chat history UI — restore to default welcome message
+    if (elements.chatHistory) {
+        elements.chatHistory.innerHTML = `
+            <div class="chat-message bot">
+                <div class="msg-avatar" style="display: flex; align-items: center; justify-content: center;">
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="16" rx="2" ry="2"></rect><rect x="9" y="9" width="6" height="6"></rect><line x1="9" y1="1" x2="9" y2="4"></line><line x1="15" y1="1" x2="15" y2="4"></line><line x1="9" y1="20" x2="9" y2="23"></line><line x1="15" y1="20" x2="15" y2="23"></line><line x1="20" y1="9" x2="23" y2="9"></line><line x1="20" y1="15" x2="23" y2="15"></line><line x1="1" y1="9" x2="4" y2="9"></line><line x1="1" y1="15" x2="4" y2="15"></line></svg>
+                </div>
+                <div class="msg-bubble">
+                    Hello! I'm your AI Diagnostics &amp; RCA Assistant. Ask me anything about ECU architecture, CAN DTC root cause analysis, or ask me to <b>generate reports and draw custom charts</b>.
+                </div>
+            </div>
+        `;
+    }
+
+    // Show quick chips again
+    const quickChips = document.getElementById('chat-quick-chips');
+    if (quickChips) quickChips.style.display = '';
+
+    // Focus input
+    if (elements.chatInput) elements.chatInput.focus();
+    
+    // Refresh sessions list
+    loadChatSessions();
+}
+
+function loadChatSessions() {
+    fetch('/api/ai/chat/sessions')
+        .then(res => res.json())
+        .then(data => {
+            const listEl = document.getElementById('chat-sessions-list');
+            if (!listEl) return;
+            
+            if (data.status === 'success' && data.sessions && data.sessions.length > 0) {
+                let html = '';
+                data.sessions.forEach(session => {
+                    const isActive = session.id === chatSessionId ? 'active' : '';
+                    let dateStr = '';
+                    if (session.updated_at) {
+                        const isoStr = session.updated_at.replace(' ', 'T') + (session.updated_at.includes('Z') ? '' : 'Z');
+                        const dateObj = new Date(isoStr);
+                        if (!isNaN(dateObj.getTime())) {
+                            dateStr = dateObj.toLocaleDateString() + ' ' + dateObj.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+                        } else {
+                            dateStr = session.updated_at;
+                        }
+                    }
+                    
+                    html += `
+                        <div class="chat-session-item ${isActive}" onclick="selectChatSession('${session.id}')">
+                            <div class="chat-session-info">
+                                <span class="chat-session-title">${escapeHtml(session.title)}</span>
+                                <span class="chat-session-date">${dateStr}</span>
+                            </div>
+                            <button class="chat-session-delete" onclick="deleteChatSession('${session.id}', event)" title="Delete Chat">
+                                <svg fill="none" height="14" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewBox="0 0 24 24" width="14"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path><line x1="10" y1="11" x2="10" y2="17"></line><line x1="14" y1="11" x2="14" y2="17"></line></svg>
+                            </button>
+                        </div>
+                    `;
+                });
+                listEl.innerHTML = html;
+            } else {
+                listEl.innerHTML = '<div style="padding: 10px; font-size: 0.8rem; color: var(--text-muted); text-align: center;">No previous chats</div>';
+            }
+        })
+        .catch(err => console.error('Failed to load chat sessions:', err));
+}
+
+function selectChatSession(id) {
+    if (chatSessionId === id) return;
+    
+    chatSessionId = id;
+    loadChatSessions(); // Update active state in UI
+    
+    if (elements.chatHistory) {
+        elements.chatHistory.innerHTML = '<div style="padding: 20px; text-align: center; color: var(--text-muted); font-size: 0.9rem;">Loading history...</div>';
+    }
+    
+    fetch('/api/ai/chat/history?session_id=' + encodeURIComponent(id))
+        .then(res => res.json())
+        .then(data => {
+            if (data.status === 'success' && data.history) {
+                if (elements.chatHistory) {
+                    elements.chatHistory.innerHTML = '';
+                    if (data.history.length === 0) {
+                        elements.chatHistory.innerHTML = '<div style="padding: 20px; text-align: center; color: var(--text-muted); font-size: 0.9rem;">No messages in this chat.</div>';
+                    } else {
+                        data.history.forEach((msg, idx) => {
+                            if (msg.role === 'system') return;
+                            
+                            let contentHtml = renderMarkdownSimple(msg.content);
+                            const msgId = `history-msg-${Date.now()}-${idx}`;
+                            
+                            if (msg.role === 'assistant' && msg.chart_spec) {
+                                chatChartCounter++;
+                                const canvasId = `chat-chart-canvas-${chatChartCounter}`;
+                                contentHtml += `<div class="chat-canvas-container"><canvas id="${canvasId}"></canvas></div>`;
+                                
+                                appendChatMessage('bot', contentHtml, msgId);
+                                
+                                setTimeout(() => {
+                                    renderDynamicChatChart(canvasId, msg.chart_spec);
+                                }, 100);
+                            } else {
+                                appendChatMessage(msg.role === 'user' ? 'user' : 'bot', contentHtml, msgId);
+                            }
+                        });
+                    }
+                }
+            }
+        })
+        .catch(err => {
+            console.error('Failed to load chat history:', err);
+            if (elements.chatHistory) {
+                elements.chatHistory.innerHTML = '<div style="padding: 20px; text-align: center; color: var(--error); font-size: 0.9rem;">Failed to load chat history.</div>';
+            }
+        });
+}
+
+function deleteChatSession(id, event) {
+    event.stopPropagation();
+    
+    if (!confirm('Are you sure you want to delete this chat session?')) return;
+    
+    fetch('/api/ai/chat/sessions/' + encodeURIComponent(id), {
+        method: 'DELETE'
+    })
+    .then(res => res.json())
+    .then(data => {
+        if (data.status === 'success') {
+            if (chatSessionId === id) {
+                newChatSession();
+            } else {
+                loadChatSessions();
+            }
+        }
+    })
+    .catch(err => console.error('Failed to delete chat session:', err));
 }
 
 function appendChatMessage(sender, htmlContent, msgId = null) {

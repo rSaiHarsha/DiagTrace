@@ -61,7 +61,7 @@
 </div>
 <span class="sidebar-text">AI Analysis</span>
 </a>
-<a class="sidebar-link" href="#" title="Settings">
+<a class="sidebar-link" href="#" id="btn-header-settings" title="Settings">
 <div class="sidebar-icon">
 <svg fill="none" height="20" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewbox="0 0 24 24" width="20"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
 </div>
@@ -212,6 +212,110 @@
 <div class="docked-progress-bar" id="docked-rca-progress-bar" style="width: 35%;"></div>
 </div>
 </div>
+</div>
+
+<!-- SETTINGS MODAL -->
+<div class="modal hidden" id="settings-modal">
+<div class="modal-content auth-modal-content settings-modal-content" style="max-width: 650px;">
+<div class="modal-header" style="border-bottom: none; flex-direction: column; align-items: flex-start; gap: 4px; padding: 20px 24px 15px 24px; position: relative;">
+<span class="modal-close" id="settings-close" style="position: absolute; right: 20px; top: 20px;">×</span>
+<h3 style="font-size: 1.1rem; display: flex; align-items: center; gap: 8px;">Application Settings</h3>
+<p style="font-size: 0.85rem; color: var(--text-secondary); margin: 0;">Customize your DiagTrace experience</p>
+</div>
+<div class="settings-tabs-header" style="padding: 0 24px; background: transparent; border-bottom: 1px solid var(--border-color);">
+<button class="settings-tab-btn active" id="tab-btn-ai" style="display: flex; align-items: center; justify-content: center; gap: 8px;" type="button">AI Models &amp; Keys</button>
+<button class="settings-tab-btn" id="tab-btn-theme" style="display: flex; align-items: center; justify-content: center; gap: 8px;" type="button">Display Theme</button>
+</div>
+<div class="modal-body settings-modal-body" style="padding: 24px;">
+<!-- AI Models & Keys Tab View (Default) -->
+<div class="settings-tab-view" id="settings-view-ai">
+<form class="auth-form" id="ai-settings-form" style="padding-top: 0;">
+<div class="form-group" style="margin-bottom: 5px;">
+<label for="setting-llm-model">Select NVIDIA LLM Model</label>
+<select class="form-input" id="setting-llm-model">
+<option selected="" value="openai/gpt-oss-20b">1. openai/gpt-oss-20b (OpenAI GPT-OSS 20B)</option>
+<option value="openai/gpt-oss-120b">2. openai/gpt-oss-120b (OpenAI GPT-OSS 120B)</option>
+<option value="nvidia/llama-3.1-nemotron-70b-instruct">3. nvidia/llama-3.1-nemotron-70b-instruct (NVIDIA Nemotron 70B)</option>
+<option value="nvidia/llama-3.3-nemotron-super-49b-v1">4. nvidia/llama-3.3-nemotron-super-49b-v1 (NVIDIA Nemotron 49B)</option>
+<option value="meta/llama-3.1-8b-instruct">5. meta/llama-3.1-8b-instruct (Lightweight / Fast 8B)</option>
+<option value="google/gemma-4-31b-it">6. google/gemma-4-31b-it (Google Gemma 4 31B)</option>
+</select>
+</div>
+<div class="form-group" style="margin-bottom: 5px;">
+<label for="setting-embed-model">Embedding Vector Model</label>
+<select class="form-input" id="setting-embed-model">
+<option value="nvidia/nv-embedqa-e5-v5">nvidia/nv-embedqa-e5-v5 (Default)</option>
+<option value="nvidia/llama-3.2-nv-embedqa-1b-v2">nvidia/llama-3.2-nv-embedqa-1b-v2</option>
+</select>
+</div>
+<div class="form-group" style="margin-bottom: 10px;">
+<label for="setting-nvidia-key">NVIDIA API Key</label>
+<div style="position: relative; display: flex; align-items: center;">
+<input autocomplete="off" class="form-input" id="setting-nvidia-key" placeholder="nvapi-..." style="width: 100%; padding-right: 42px; background-color: #e0f2fe; border: 1px solid #38bdf8; color: #0369a1; border-radius: 8px; font-weight: 500; font-size: 0.92rem;" type="password"/>
+<button id="btn-toggle-nvidia-key" style="position: absolute; right: 10px; background: transparent; border: none; color: #0284c7; cursor: pointer; display: flex; align-items: center; justify-content: center; padding: 4px;" title="Show/Hide Key" type="button">
+<svg fill="none" height="18" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewbox="0 0 24 24" width="18"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
+</button>
+</div>
+</div>
+<div class="form-group" style="margin-bottom: 10px;">
+<label for="setting-qdrant-url">Qdrant Cluster URL</label>
+<input autocomplete="off" class="form-input" id="setting-qdrant-url" placeholder="https://your-cluster.qdrant.tech" style="background-color: #e0f2fe; border: 1px solid #38bdf8; color: #0369a1; border-radius: 8px; font-weight: 500; font-size: 0.92rem;" type="text"/>
+</div>
+<div class="form-group" style="margin-bottom: 18px;">
+<label for="setting-qdrant-key">Qdrant API Key</label>
+<div style="position: relative; display: flex; align-items: center;">
+<input autocomplete="off" class="form-input" id="setting-qdrant-key" placeholder="Enter Qdrant Cloud API key..." style="width: 100%; padding-right: 42px; background-color: #e0f2fe; border: 1px solid #38bdf8; color: #0369a1; border-radius: 8px; font-weight: 500; font-size: 0.92rem;" type="password"/>
+<button id="btn-toggle-qdrant-key" style="position: absolute; right: 10px; background: transparent; border: none; color: #0284c7; cursor: pointer; display: flex; align-items: center; justify-content: center; padding: 4px;" title="Show/Hide Key" type="button">
+<svg fill="none" height="18" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewbox="0 0 24 24" width="18"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
+</button>
+</div>
+</div>
+<div style="display: flex; gap: 10px;">
+<button class="btn btn-secondary" id="btn-test-ai-settings" style="flex: 1; display: flex; justify-content: center; align-items: center; gap: 8px; font-size: 0.95rem; background: transparent; border: 1px solid var(--border-color);" type="button">Test Connections</button>
+<button class="btn btn-primary" style="flex: 1; display: flex; justify-content: center; align-items: center; gap: 8px; font-size: 0.95rem;" type="submit">Save Settings</button>
+</div>
+</form>
+</div>
+<!-- Theme Tab View -->
+<div class="settings-tab-view hidden" id="settings-view-theme">
+<div class="settings-section">
+<h4 style="font-size: 0.95rem; font-weight: 600;">Choose Display Theme</h4>
+<p class="settings-desc" style="margin-bottom: 15px;">Select your preferred visual theme for the DiagTrace portal.</p>
+<div class="theme-options-grid" style="grid-template-columns: 1fr 1fr; gap: 20px;">
+<label class="theme-option-card" style="padding: 16px; position: relative; border-radius: 12px;">
+<input checked="" name="app-theme" type="radio" value="white"/>
+<span class="theme-preview white-preview" style="height: 50px; border-radius: 8px; margin-bottom: 8px; border: none; background: linear-gradient(135deg, #ffffff 50%, #e2e8f0 50%);"></span>
+<span class="theme-label" style="display: flex; align-items: center; gap: 8px;"><input checked="" style="display: inline-block; width: 14px; height: 14px; accent-color: var(--primary); margin: 0;" type="radio"/> Default White</span>
+</label>
+<label class="theme-option-card" style="padding: 16px; position: relative; border-radius: 12px;">
+<input name="app-theme" type="radio" value="light-blue"/>
+<span class="theme-preview light-blue-preview" style="height: 50px; border-radius: 8px; margin-bottom: 8px; border: none;"></span>
+<span class="theme-label" style="display: flex; align-items: center; gap: 8px;"><input style="display: inline-block; width: 14px; height: 14px; margin: 0;" type="radio"/> Light Blue</span>
+</label>
+<label class="theme-option-card" style="padding: 16px; position: relative; border-radius: 12px;">
+<input name="app-theme" type="radio" value="current-blue"/>
+<span class="theme-preview dark-blue-preview" style="height: 50px; border-radius: 8px; margin-bottom: 8px; border: none;"></span>
+<span class="theme-label" style="display: flex; align-items: center; gap: 8px;"><input style="display: inline-block; width: 14px; height: 14px; margin: 0;" type="radio"/> Current Blue</span>
+</label>
+<label class="theme-option-card" style="padding: 16px; position: relative; border-radius: 12px;">
+<input name="app-theme" type="radio" value="system"/>
+<span class="theme-preview system-preview" style="height: 50px; border-radius: 8px; margin-bottom: 8px; border: none;"></span>
+<span class="theme-label" style="display: flex; align-items: center; gap: 8px;"><input style="display: inline-block; width: 14px; height: 14px; margin: 0;" type="radio"/> System Theme</span>
+</label>
+</div>
+<div style="background: rgba(245, 158, 11, 0.1); border-radius: 6px; padding: 12px; margin-top: 20px; font-size: 0.8rem; color: #d97706; display: flex; align-items: center; gap: 8px;">
+    Theme changes are applied instantly across the application.
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+
+<!-- Notification Toast -->
+<div class="toast hidden" id="toast">
+<span class="toast-icon">✅</span>
+<span id="toast-message">Action completed successfully.</span>
 </div>
 
 <script src="app.js?v=2.1.0"></script>

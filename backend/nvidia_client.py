@@ -155,6 +155,90 @@ def query_nvidia_llm(prompt: str, system_prompt: Optional[str] = None, temperatu
 
     raise RuntimeError(f"NVIDIA API Call Failed after retries: {last_error_msg}")
 
+def query_nvidia_llm_with_history(messages: List[Dict[str, str]], temperature: float = 0.3, max_tokens: int = 1000, timeout: int = 300) -> str:
+    """Queries NVIDIA NIM API with a full messages[] array for multi-turn conversations.
+    
+    Args:
+        messages: List of {role: 'system'|'user'|'assistant', content: str} dicts.
+        temperature: Sampling temperature.
+        max_tokens: Max tokens for the response.
+        timeout: Request timeout in seconds.
+    
+    Returns:
+        The assistant's reply text.
+    """
+    api_key = get_nvidia_api_key()
+    model = get_nvidia_model()
+    
+    if not api_key or api_key.startswith("nvapi-your-key"):
+        raise RuntimeError("NVIDIA_API_KEY is missing or invalid. Please enter your valid NVIDIA API Key in Settings.")
+
+    headers = {
+        "Authorization": f"Bearer {api_key}",
+        "Content-Type": "application/json",
+        "Accept": "application/json"
+    }
+
+    payload = {
+        "model": model,
+        "messages": messages,
+        "temperature": temperature,
+        "max_tokens": max_tokens,
+        "stream": True
+    }
+
+    last_error_msg = ""
+
+    for attempt in range(1, 4):
+        try:
+            with requests.post(f"{NVIDIA_BASE_URL}/chat/completions", headers=headers, json=payload, timeout=timeout, stream=True) as res:
+                if res.status_code == 200:
+                    content_parts = []
+                    for line in res.iter_lines():
+                        if line:
+                            line_str = line.decode('utf-8')
+                            if line_str.startswith("data: "):
+                                data_str = line_str[6:].strip()
+                                if data_str == "[DONE]":
+                                    break
+                                try:
+                                    data_obj = json.loads(data_str)
+                                    if "choices" in data_obj and len(data_obj["choices"]) > 0:
+                                        delta = data_obj["choices"][0].get("delta", {})
+                                        if "content" in delta:
+                                            content_parts.append(delta["content"])
+                                except Exception:
+                                    pass
+                    return "".join(content_parts).strip()
+                else:
+                    err_text = res.text
+                    try:
+                        err_data = json.loads(err_text)
+                        err_msg = err_data.get("detail") or err_data.get("message") or err_text
+                        if isinstance(err_data.get("error"), dict) and "message" in err_data["error"]:
+                            err_msg = err_data["error"]["message"]
+                    except Exception:
+                        err_msg = err_text
+
+            last_error_msg = f"HTTP {res.status_code}: {err_msg}"
+
+            if res.status_code in (401, 403):
+                raise RuntimeError(f"NVIDIA API Authorization Failed (HTTP {res.status_code}): Invalid API key.")
+
+            if res.status_code in (503, 429, 504, 502):
+                wait_time = attempt * 2
+                print(f"⚠️ [NVIDIA API {res.status_code}] Chat history request busy. Retrying in {wait_time}s (Attempt {attempt}/3)...")
+                time.sleep(wait_time)
+                continue
+            else:
+                break
+
+        except requests.exceptions.RequestException as e:
+            last_error_msg = f"Connection Error: {str(e)}"
+            time.sleep(attempt * 2)
+
+    raise RuntimeError(f"NVIDIA API Call Failed after retries: {last_error_msg}")
+
 def get_nvidia_vision_model() -> str:
     return os.getenv("NVIDIA_VISION_MODEL", "meta/llama-3.2-11b-vision-instruct").strip()
 

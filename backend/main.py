@@ -23,7 +23,7 @@ from backend.parser import DiagnosticParser
 from backend.database import (
     init_db, load_from_db, save_to_db, update_row, merge_and_deduplicate,
     create_user, authenticate_user, create_session, get_user_by_token, delete_session, update_ai_analysis,
-    save_report, get_all_reports, get_report_by_id, delete_report
+    save_report, get_all_reports, get_report_by_id, delete_report, get_all_chat_sessions
 )
 from backend.rag_engine import (
     ingest_knowledge_document, ingest_file_document, 
@@ -35,7 +35,7 @@ from backend.rca_engine import (
     list_available_log_files, run_per_file_quick_stats, run_ai_rca_analysis_for_file
 )
 from backend.log_analysis_engine import run_log_analysis
-from backend.chatbot_engine import process_chatbot_query
+from backend.chatbot_engine import process_chatbot_query, get_chat_session, clear_chat_session
 from backend.nvidia_client import get_nvidia_model, get_nvidia_embed_model, set_nvidia_ai_config
 
 app = FastAPI(title="Vehicle Diagnostics Parser Engine")
@@ -92,6 +92,7 @@ class RAGIngestRequest(BaseModel):
 
 class ChatQueryRequest(BaseModel):
     message: str
+    session_id: Optional[str] = None
 
 class SaveReportRequest(BaseModel):
     title: str
@@ -516,11 +517,47 @@ def ai_weekly_summary_endpoint():
 @app.post("/api/ai/chat")
 def ai_chat_endpoint(payload: ChatQueryRequest):
     try:
-        res = process_chatbot_query(payload.message)
+        res = process_chatbot_query(payload.message, session_id=payload.session_id)
         return res
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"AI Chatbot error: {str(e)}")
 
+class ChatSessionRequest(BaseModel):
+    session_id: str
+
+@app.post("/api/ai/chat/clear")
+def clear_chat_session_endpoint(payload: ChatSessionRequest):
+    """Clears conversation history for a given session."""
+    cleared = clear_chat_session(payload.session_id)
+    return {"status": "success", "cleared": cleared}
+
+@app.get("/api/ai/chat/sessions")
+def list_chat_sessions_endpoint():
+    """Lists all saved chat sessions."""
+    try:
+        sessions = get_all_chat_sessions()
+        return {"status": "success", "sessions": sessions}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to fetch chat sessions: {str(e)}")
+
+@app.delete("/api/ai/chat/sessions/{session_id}")
+def delete_chat_session_endpoint(session_id: str):
+    """Deletes a specific chat session."""
+    try:
+        cleared = clear_chat_session(session_id)
+        if not cleared:
+            raise HTTPException(status_code=404, detail="Session not found")
+        return {"status": "success", "deleted": True}
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to delete chat session: {str(e)}")
+
+@app.get("/api/ai/chat/history")
+def get_chat_history_endpoint(session_id: str = Query(...)):
+    """Returns conversation history for a given session."""
+    history = get_chat_session(session_id)
+    return {"status": "success", "session_id": session_id, "history": history}
 # --- Saved Reports API ---
 
 @app.get("/api/reports")

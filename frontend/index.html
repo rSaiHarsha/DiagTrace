@@ -2013,8 +2013,8 @@
             <div class="chat-drawer hidden" id="chat-drawer">
                 <div class="chat-header">
                     <div class="chat-title">
-                        <span style="display: flex; align-items: center; gap: 6px"
-                            ><svg
+                        <span style="display: flex; align-items: center; gap: 6px">
+                            <svg
                                 fill="none"
                                 height="16"
                                 stroke="currentColor"
@@ -2022,7 +2022,7 @@
                                 stroke-linejoin="round"
                                 stroke-width="2"
                                 style="color: var(--primary)"
-                                viewbox="0 0 24 24"
+                                viewBox="0 0 24 24"
                                 width="16"
                             >
                                 <rect height="16" rx="2" ry="2" width="16" x="4" y="4"></rect>
@@ -2040,7 +2040,25 @@
                         >
                         <span class="chat-status-dot"></span>
                     </div>
-                    <button class="close-dialog-btn" id="chat-drawer-close">×</button>
+                    <div class="chat-header-actions">
+                        <button class="new-chat-btn" id="chat-new-chat" title="Start New Chat">
+                            <svg fill="none" height="14" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewBox="0 0 24 24" width="14">
+                                <line x1="12" y1="5" x2="12" y2="19"></line>
+                                <line x1="5" y1="12" x2="19" y2="12"></line>
+                            </svg>
+                            <span class="new-chat-text">New Chat</span>
+                        </button>
+                        <button class="expand-dialog-btn" id="chat-drawer-expand" title="Expand Assistant Dialog">
+                            <svg fill="none" height="14" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewBox="0 0 24 24" width="14">
+                                <polyline points="15 3 21 3 21 9"></polyline>
+                                <polyline points="9 21 3 21 3 15"></polyline>
+                                <line x1="21" y1="3" x2="14" y2="10"></line>
+                                <line x1="3" y1="21" x2="10" y2="14"></line>
+                            </svg>
+                            <span class="expand-text">Expand</span>
+                        </button>
+                        <button class="close-dialog-btn" id="chat-drawer-close" title="Close Assistant">×</button>
+                    </div>
                 </div>
                 <div class="chat-history" id="chat-history">
                     <div class="chat-message bot">
@@ -2052,7 +2070,7 @@
                                 stroke-linecap="round"
                                 stroke-linejoin="round"
                                 stroke-width="2"
-                                viewbox="0 0 24 24"
+                                viewBox="0 0 24 24"
                                 width="15"
                             >
                                 <rect height="16" rx="2" ry="2" width="16" x="4" y="4"></rect>
@@ -2068,74 +2086,69 @@
                             </svg>
                         </div>
                         <div class="msg-bubble">
-                            Hello! I am your AI Diagnostics &amp; RAG Assistant. Ask me anything about ECU
-                            architectures, CAN signal matrices, DTC root cause analysis, or ask me to
-                            <b>generate reports and draw custom charts</b>!
+                            Hello! I'm your AI Diagnostics &amp; RCA Assistant. Ask me anything about ECU architecture, CAN DTC root cause analysis, or ask me to <b>generate reports and draw custom charts</b>.
                         </div>
                     </div>
                 </div>
-                <div class="chat-quick-chips">
-                    <button
-                        class="chip-btn"
-                        data-prompt="Perform AI Root Cause Analysis on current diagnostic data"
-                        style="display: flex; align-items: center; gap: 4px"
-                    >
-                        <svg
-                            fill="none"
-                            height="12"
-                            stroke="currentColor"
-                            stroke-linecap="round"
-                            stroke-linejoin="round"
-                            stroke-width="2"
-                            viewbox="0 0 24 24"
-                            width="12"
-                        >
-                            <rect height="16" rx="2" ry="2" width="16" x="4" y="4"></rect>
-                            <rect height="6" width="6" x="9" y="9"></rect>
-                        </svg>
-                        Run AI RCA
+                <div class="chat-quick-chips" id="chat-quick-chips">
+                    <button class="chip-card chip-btn" data-prompt="Perform AI Root Cause Analysis on current diagnostic data">
+                        <div class="chip-icon-box">
+                            <svg fill="none" height="18" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewBox="0 0 24 24" width="18">
+                                <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"></path>
+                                <rect height="4" rx="1" ry="1" width="8" x="8" y="2"></rect>
+                                <path d="M9 12h6M9 16h6"></path>
+                            </svg>
+                        </div>
+                        <div class="chip-content">
+                            <span class="chip-title">Run AI RCA</span>
+                            <span class="chip-desc">Run AI based Root Cause Analysis</span>
+                        </div>
                     </button>
-                    <button
-                        class="chip-btn"
-                        data-prompt="Draw a chart showing Top Modules DTC breakdown"
-                        style="display: flex; align-items: center; gap: 4px"
-                    >
-                        <svg
-                            fill="none"
-                            height="12"
-                            stroke="currentColor"
-                            stroke-linecap="round"
-                            stroke-linejoin="round"
-                            stroke-width="2"
-                            viewbox="0 0 24 24"
-                            width="12"
-                        >
-                            <line x1="18" x2="18" y1="20" y2="10"></line>
-                            <line x1="12" x2="12" y1="20" y2="4"></line>
-                            <line x1="6" x2="6" y1="20" y2="14"></line>
-                        </svg>
-                        Draw Module Chart
+                    <button class="chip-card chip-btn" data-prompt="Draw a chart showing Top Modules DTC breakdown">
+                        <div class="chip-icon-box">
+                            <svg fill="none" height="18" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewBox="0 0 24 24" width="18">
+                                <rect height="7" rx="1" width="7" x="3" y="3"></rect>
+                                <rect height="7" rx="1" width="7" x="14" y="3"></rect>
+                                <rect height="7" rx="1" width="7" x="14" y="14"></rect>
+                                <rect height="7" rx="1" width="7" x="3" y="14"></rect>
+                            </svg>
+                        </div>
+                        <div class="chip-content">
+                            <span class="chip-title">Draw Module Chart</span>
+                            <span class="chip-desc">Visualize module communication</span>
+                        </div>
                     </button>
-                    <button
-                        class="chip-btn"
-                        data-prompt="Show diagnostic issue status distribution chart"
-                        style="display: flex; align-items: center; gap: 4px"
-                    >
-                        <svg
-                            fill="none"
-                            height="12"
-                            stroke="currentColor"
-                            stroke-linecap="round"
-                            stroke-linejoin="round"
-                            stroke-width="2"
-                            viewbox="0 0 24 24"
-                            width="12"
-                        >
-                            <path d="M21.21 15.89A10 10 0 1 1 8 2.83"></path>
-                            <path d="M22 12A10 10 0 0 0 12 2v10z"></path>
-                        </svg>
-                        Status Chart
+                    <button class="chip-card chip-btn" data-prompt="Generate diagnostic report">
+                        <div class="chip-icon-box">
+                            <svg fill="none" height="18" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewBox="0 0 24 24" width="18">
+                                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                                <polyline points="14 2 14 8 20 8"></polyline>
+                                <line x1="16" x2="8" y1="13" y2="13"></line>
+                                <line x1="16" x2="8" y1="17" y2="17"></line>
+                                <polyline points="10 9 9 9 8 9"></polyline>
+                            </svg>
+                        </div>
+                        <div class="chip-content">
+                            <span class="chip-title">Generate Report</span>
+                            <span class="chip-desc">Create custom diagnostic reports</span>
+                        </div>
                     </button>
+                    <button class="chip-card chip-btn" data-prompt="Show diagnostic issue status distribution chart">
+                        <div class="chip-icon-box">
+                            <svg fill="none" height="18" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewBox="0 0 24 24" width="18">
+                                <polyline points="23 6 13.5 15.5 8.5 10.5 1 18"></polyline>
+                                <polyline points="17 6 23 6 23 12"></polyline>
+                            </svg>
+                        </div>
+                        <div class="chip-content">
+                            <span class="chip-title">View Status Chart</span>
+                            <span class="chip-desc">Open issue status analytics</span>
+                        </div>
+                    </button>
+                    
+                    <div class="chat-sessions-list" id="chat-sessions-list">
+                        <!-- Populated dynamically via JS -->
+                    </div>
                 </div>
                 <form class="chat-input-form" id="chat-form">
                     <input

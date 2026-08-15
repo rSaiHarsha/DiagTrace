@@ -379,12 +379,18 @@ function handleRagIngest(e) {
 function toggleChatDrawer() {
     if (elements.chatDrawer) {
         elements.chatDrawer.classList.toggle('hidden');
+        if (elements.chatDrawer.classList.contains('hidden') && typeof closeExpandChatDrawer === 'function') {
+            closeExpandChatDrawer();
+        }
     }
 }
 
 function closeChatDrawer() {
     if (elements.chatDrawer) {
         elements.chatDrawer.classList.add('hidden');
+        if (typeof closeExpandChatDrawer === 'function') {
+            closeExpandChatDrawer();
+        }
     }
 }
 

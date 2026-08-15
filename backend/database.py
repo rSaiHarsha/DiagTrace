@@ -92,6 +92,15 @@ def init_db():
                     FOREIGN KEY(user_id) REFERENCES users(id)
                 )
             """)
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS chat_sessions (
+                    id TEXT PRIMARY KEY,
+                    title TEXT NOT NULL,
+                    history_json TEXT NOT NULL,
+                    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+                )
+            """)
             conn.commit()
             conn.close()
         except Exception as e:
@@ -388,3 +397,78 @@ def delete_report(report_id: int) -> bool:
         conn.commit()
         conn.close()
         return rows_affected > 0
+
+# --- Chat Sessions ---
+
+def get_all_chat_sessions() -> List[Dict[str, Any]]:
+    """Retrieves all chat sessions ordered by most recently updated."""
+    try:
+        conn = get_connection()
+        conn.row_factory = sqlite3.Row
+        cursor = conn.cursor()
+        cursor.execute("SELECT id, title, updated_at FROM chat_sessions ORDER BY updated_at DESC")
+        rows = cursor.fetchall()
+        conn.close()
+        return [dict(row) for row in rows]
+    except Exception as e:
+        print(f"Error fetching chat sessions: {e}")
+        return []
+
+def get_chat_session_db(session_id: str) -> Optional[Dict[str, Any]]:
+    """Retrieves a specific chat session."""
+    try:
+        conn = get_connection()
+        conn.row_factory = sqlite3.Row
+        cursor = conn.cursor()
+        cursor.execute("SELECT id, title, history_json, created_at, updated_at FROM chat_sessions WHERE id = ?", (session_id,))
+        row = cursor.fetchone()
+        conn.close()
+        if row:
+            return dict(row)
+        return None
+    except Exception as e:
+        print(f"Error fetching chat session {session_id}: {e}")
+        return None
+
+def save_chat_session_db(session_id: str, title: str, history_json: str):
+    """Inserts or updates a chat session."""
+    try:
+        with db_lock:
+            conn = get_connection()
+            cursor = conn.cursor()
+            cursor.execute("SELECT id FROM chat_sessions WHERE id = ?", (session_id,))
+            exists = cursor.fetchone()
+            
+            if exists:
+                cursor.execute("""
+                    UPDATE chat_sessions 
+                    SET title = ?, history_json = ?, updated_at = CURRENT_TIMESTAMP
+                    WHERE id = ?
+                """, (title, history_json, session_id))
+            else:
+                cursor.execute("""
+                    INSERT INTO chat_sessions (id, title, history_json) 
+                    VALUES (?, ?, ?)
+                """, (session_id, title, history_json))
+                
+            conn.commit()
+            conn.close()
+    except Exception as e:
+        print(f"Error saving chat session {session_id}: {e}")
+
+def delete_chat_session_db(session_id: str) -> bool:
+    """Deletes a chat session."""
+    try:
+        with db_lock:
+            conn = get_connection()
+            cursor = conn.cursor()
+            cursor.execute("DELETE FROM chat_sessions WHERE id = ?", (session_id,))
+            rows_affected = cursor.rowcount
+            conn.commit()
+            conn.close()
+            return rows_affected > 0
+    except Exception as e:
+        print(f"Error deleting chat session {session_id}: {e}")
+        return False
+
+
