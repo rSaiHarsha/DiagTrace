@@ -37,7 +37,7 @@ from backend.rca_engine import (
 from backend.log_analysis_engine import run_log_analysis
 from backend.chatbot_engine import process_chatbot_query, get_chat_session, clear_chat_session
 from backend.nvidia_client import get_nvidia_model, get_nvidia_embed_model, set_nvidia_ai_config
-from backend.knowledge_graph_engine import get_dtc_list, build_knowledge_graph
+from backend.knowledge_graph_engine import get_dtc_list, build_knowledge_graph, build_dynamic_graph
 
 app = FastAPI(title="Vehicle Diagnostics Parser Engine")
 API_VERSION = "2.0.0"
@@ -570,6 +570,16 @@ def kg_dtc_list_endpoint():
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to fetch DTC list: {str(e)}")
 
+@app.get("/api/knowledge-graph/explore")
+def kg_explore_graph_endpoint(entity_type: str = Query(...), entity_id: str = Query(...)):
+    """Builds a dynamic knowledge graph centered around a specific entity (module, vin, program)."""
+    try:
+        graph_data = build_dynamic_graph(entity_type, entity_id)
+        return graph_data
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to build dynamic knowledge graph: {str(e)}")
+
+
 @app.get("/api/knowledge-graph/{dtc_code}")
 def kg_build_graph_endpoint(dtc_code: str):
     """Builds and returns the full knowledge graph for a specific DTC code."""
@@ -578,6 +588,101 @@ def kg_build_graph_endpoint(dtc_code: str):
         return graph_data
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to build knowledge graph: {str(e)}")
+
+@app.get("/api/knowledge-graph/analysis/{dtc_code}")
+def kg_get_analysis_endpoint(dtc_code: str):
+    """Fetches existing AI log analysis reports for a given DTC code."""
+    try:
+        df = load_from_db()
+        if df is None or df.empty:
+            return {"status": "success", "reports": []}
+        
+        # Filter for the DTC code (case insensitive matching might be safer)
+        dtc_rows = df[df['Code'].astype(str).str.upper() == dtc_code.upper()]
+        
+        reports = []
+        for _, row in dtc_rows.iterrows():
+            ai_analysis = str(row.get('AI Analysis', ''))
+            if ai_analysis and ai_analysis.strip() and ai_analysis.lower() != 'nan':
+                # Build a summary title using module and date if available
+                module = row.get('Module', 'Unknown Module')
+                date_str = row.get('Last Updated', 'Unknown Date')
+                row_idx = row.get('index', 'N/A')
+                reports.append({
+                    "id": f"row_{row_idx}",
+                    "title": f"Log Analysis: {module} (Row #{row_idx})",
+                    "date": date_str,
+                    "markdown": ai_analysis
+                })
+        
+        # Optionally, check saved_reports table for reports with this DTC code in the title
+        try:
+            saved = get_all_reports()
+            for r in saved:
+                if dtc_code.upper() in r.get('title', '').upper():
+                    reports.append({
+                        "id": f"saved_{r['id']}",
+                        "title": r.get('title'),
+                        "date": r.get('created_at'),
+                        "markdown": r.get('content_markdown')
+                    })
+        except Exception:
+            pass # Ignore saved reports if error
+
+        return {"status": "success", "reports": reports}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to fetch analysis: {str(e)}")
+
+@app.post("/api/knowledge-graph/analyze/{dtc_code}")
+async def kg_analyze_dtc_endpoint(dtc_code: str, request: Request):
+    """Generates a new AI log analysis for the given DTC code on the fly."""
+    try:
+        df = load_from_db()
+        if df is None or df.empty:
+            raise HTTPException(status_code=404, detail="No diagnostic data available.")
+        
+        dtc_rows = df[df['Code'].astype(str).str.upper() == dtc_code.upper()]
+        if dtc_rows.empty:
+            raise HTTPException(status_code=404, detail=f"No logs found for DTC {dtc_code}.")
+        
+        # Grab the first matching row to analyze
+        row_series = dtc_rows.iloc[0]
+        # Convert all values to standard Python types, filling NaNs
+        row_data = {}
+        for k, v in row_series.items():
+            if pd.isna(v):
+                row_data[k] = ""
+            else:
+                row_data[k] = str(v)
+        
+        # Must ensure 'index' is present as an int for the update function
+        if 'index' in row_series and not pd.isna(row_series['index']):
+            row_data['index'] = int(row_series['index'])
+            
+        abort_event = threading.Event()
+        task = asyncio.create_task(asyncio.to_thread(run_log_analysis, row_data, abort_event))
+        
+        while not task.done():
+            if await request.is_disconnected():
+                abort_event.set()
+                task.cancel()
+                raise HTTPException(status_code=499, detail="Client Closed Request")
+            await asyncio.sleep(0.5)
+            
+        result = task.result()
+        if result and result.get("status") == "success":
+            # Update DB with the analysis
+            if 'index' in row_data:
+                update_ai_analysis(row_data['index'], result.get("report_markdown", ""))
+            return {"status": "success", "report": result.get("report_markdown", "")}
+        else:
+            raise HTTPException(status_code=500, detail="Log analysis failed to return success.")
+    except HTTPException:
+        raise
+    except Exception as e:
+        if "Cancelled" in str(e):
+            raise HTTPException(status_code=499, detail="Cancelled")
+        raise HTTPException(status_code=500, detail=f"Failed to run log analysis: {str(e)}")
 
 # --- Saved Reports API ---
 

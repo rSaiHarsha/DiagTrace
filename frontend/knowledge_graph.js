@@ -10,7 +10,10 @@ let kgState = {
     simulation: null,
     svg: null,
     zoom: null,
-    selectedNode: null
+    selectedNode: null,
+    rawNodes: [],
+    rawEdges: [],
+    expandedGroups: {}
 };
 
 // ── Initialization ──────────────────────────────────────────────
@@ -109,14 +112,28 @@ function selectDtcFromSearch(code) {
 }
 
 function selectDtc(code) {
-    kgState.currentDtc = code;
+    selectEntity('dtc', code);
+}
+
+function selectEntity(type, id) {
+    kgState.currentDtc = id;
     showLoading(true);
 
-    fetch(`/api/knowledge-graph/${encodeURIComponent(code)}`)
+    let url = `/api/knowledge-graph/explore?entity_type=${encodeURIComponent(type)}&entity_id=${encodeURIComponent(id)}`;
+    if (type === 'dtc') {
+        url = `/api/knowledge-graph/${encodeURIComponent(id)}`;
+    }
+
+    fetch(url)
         .then(r => r.json())
         .then(data => {
             if (data.status === 'success') {
                 kgState.graphData = data;
+                kgState.rawNodes = [...data.graph.nodes];
+                kgState.rawEdges = [...data.graph.edges];
+                kgState.expandedGroups = {};
+                
+                hideDetailPanel();
                 renderGraph(data.graph);
                 renderSidebar(data);
                 renderBottomPanels(data);
@@ -169,6 +186,14 @@ function renderGraph(graphSpec) {
     svg.call(zoom);
     kgState.zoom = zoom;
     kgState.svg = svg;
+
+    // Clear highlight on background click
+    svg.on('click', () => {
+        kgState.selectedNode = null;
+        d3.selectAll('.kg-node-group').classed('dimmed', false);
+        d3.selectAll('.kg-edge-line').classed('dimmed', false);
+        hideDetailPanel();
+    });
 
     // Center the view
     svg.call(zoom.transform, d3.zoomIdentity.translate(width / 2, height / 2));
@@ -250,50 +275,45 @@ function renderGraph(graphSpec) {
         .on('click', (event, d) => {
             event.stopPropagation();
             onNodeClick(d);
+        })
+        .on('dblclick', (event, d) => {
+            event.stopPropagation();
+            onNodeDblClick(d);
         });
 
-    // Node cards (rounded rects)
+    // Node cards (foreignObject)
     node.each(function (d) {
         const g = d3.select(this);
         const isDtc = d.type === 'dtc';
-        const cardW = isDtc ? 180 : 160;
-        const cardH = isDtc ? 80 : 60;
+        const isGroup = d.type === 'group_node';
+        const cardW = isDtc ? 180 : (isGroup ? 140 : 160);
+        const cardH = isDtc ? 80 : (isGroup ? 50 : 60);
 
-        g.append('rect')
-            .attr('class', 'kg-node-card')
+        const fo = g.append('foreignObject')
             .attr('x', -cardW / 2)
             .attr('y', -cardH / 2)
             .attr('width', cardW)
-            .attr('height', cardH)
-            .attr('rx', 12)
-            .attr('ry', 12)
-            .attr('stroke-width', isDtc ? 2 : 1);
+            .attr('height', cardH);
 
-        // Main label
-        g.append('text')
-            .attr('class', 'kg-node-label')
-            .attr('text-anchor', 'middle')
-            .attr('dy', d.sublabel ? '-0.2em' : '0.35em')
-            .text(truncate(d.label, isDtc ? 20 : 22));
+        const foDiv = fo.append('xhtml:div')
+            .attr('class', 'kg-fo-card');
 
-        // Sublabel
+        foDiv.append('xhtml:div')
+            .attr('class', 'kg-fo-title')
+            .text(d.label);
+
         if (d.sublabel) {
-            g.append('text')
-                .attr('class', 'kg-node-sublabel')
-                .attr('text-anchor', 'middle')
-                .attr('dy', '1.2em')
-                .text(truncate(d.sublabel, isDtc ? 26 : 22));
+            foDiv.append('xhtml:div')
+                .attr('class', 'kg-fo-sub')
+                .text(d.sublabel);
         }
 
-        // Severity badge for DTC node
         if (isDtc && d.severity) {
-            g.append('text')
-                .attr('class', 'kg-node-sublabel')
-                .attr('text-anchor', 'middle')
-                .attr('dy', '2.4em')
-                .attr('fill', getSeverityColor(d.severity))
-                .attr('font-weight', '600')
-                .attr('font-size', '10px')
+            foDiv.append('xhtml:div')
+                .attr('class', 'kg-fo-sub')
+                .style('color', getSeverityColor(d.severity))
+                .style('font-weight', '700')
+                .style('margin-top', '4px')
                 .text(d.severity);
         }
     });
@@ -316,29 +336,180 @@ function renderGraph(graphSpec) {
 }
 
 function onNodeClick(d) {
-    kgState.selectedNode = d;
+    if (d.type === 'group_node') return;
 
-    // If it's a related DTC, load that DTC's graph
-    if (d.type === 'related_dtc') {
-        const code = d.label;
-        const input = document.getElementById('kg-search-input');
-        if (input) input.value = '';
-        selectDtc(code);
+    const focusableTypes = ['dtc', 'related_dtc', 'module', 'vin', 'programs', 'program'];
+    
+    if (focusableTypes.includes(d.type)) {
+        // If clicking the currently focused node, just collapse groups
+        if (kgState.currentDtc === d.label || kgState.currentDtc === d.id) {
+            if (Object.keys(kgState.expandedGroups).length > 0) {
+                kgState.expandedGroups = {};
+                renderGraph({nodes: kgState.rawNodes, edges: kgState.rawEdges});
+            }
+            return;
+        }
+
+        let type = d.type === 'related_dtc' ? 'dtc' : d.type === 'programs' ? 'program' : d.type;
+        selectEntity(type, d.label);
         return;
     }
+
+    // Collapse groups on click for non-focusable nodes
+    if (Object.keys(kgState.expandedGroups).length > 0) {
+        kgState.expandedGroups = {};
+        renderGraph({nodes: kgState.rawNodes, edges: kgState.rawEdges});
+        return;
+    }
+
+    // Toggle highlight
+    if (kgState.selectedNode && kgState.selectedNode.id === d.id) {
+        kgState.selectedNode = null;
+        d3.selectAll('.kg-node-group').classed('dimmed', false);
+        d3.selectAll('.kg-edge-line').classed('dimmed', false);
+        hideDetailPanel();
+        return;
+    }
+
+    kgState.selectedNode = d;
+    showDetailPanel(d);
 
     // Highlight node
     d3.selectAll('.kg-node-group').classed('dimmed', true);
     d3.selectAll('.kg-edge-line').classed('dimmed', true);
 
-    d3.selectAll('.kg-node-group').filter(n => n.id === d.id || kgState.graphData.graph.edges.some(
+    d3.selectAll('.kg-node-group').filter(n => n.id === d.id || (kgState.graphData && kgState.graphData.graph.edges.some(
         e => (e.source.id === d.id && e.target.id === n.id) || (e.target.id === d.id && e.source.id === n.id)
-    )).classed('dimmed', false);
+    ))).classed('dimmed', false);
 
     d3.selectAll('.kg-edge-line').filter(e => 
         e.source.id === d.id || e.target.id === d.id
     ).classed('dimmed', false);
 }
+
+function onNodeDblClick(d) {
+    if (d.type === 'group_node') {
+        // Expand
+        kgState.expandedGroups[d.id] = true;
+        
+        let newNodes = kgState.rawNodes.filter(n => !kgState.expandedGroups[n.id]);
+        let newEdges = kgState.rawEdges.filter(e => {
+            let targetId = e.target.id || e.target;
+            return !kgState.expandedGroups[targetId];
+        });
+        
+        for (let gid in kgState.expandedGroups) {
+            let group = kgState.rawNodes.find(n => n.id === gid);
+            if (group && group.items) {
+                group.items.forEach(item => {
+                    newNodes.push({...item});
+                    let edgeToGroup = kgState.rawEdges.find(e => (e.target.id || e.target) === gid);
+                    if (edgeToGroup) {
+                        newEdges.push({
+                            source: edgeToGroup.source.id || edgeToGroup.source,
+                            target: item.id,
+                            label: edgeToGroup.label
+                        });
+                    }
+                });
+            }
+        }
+        
+        renderGraph({nodes: newNodes, edges: newEdges});
+    }
+}
+
+// ── Detail Panel Logic ──────────────────────────────────────────
+function showDetailPanel(d) {
+    const panel = document.getElementById('kg-detail-panel');
+    if (!panel) return;
+
+    document.getElementById('kg-detail-type').textContent = (d.type || 'unknown').replace('_', ' ');
+    document.getElementById('kg-detail-title').textContent = d.label || 'Details';
+    
+    const content = document.getElementById('kg-detail-content');
+    content.innerHTML = '';
+
+    if (d.sublabel) {
+        content.innerHTML += `<p><strong>${d.sublabel}</strong></p>`;
+    }
+    
+    if (d.items && Array.isArray(d.items) && d.items.length > 0) {
+        let ul = document.createElement('ul');
+        ul.className = 'kg-detail-list';
+        d.items.forEach(item => {
+            let li = document.createElement('li');
+            li.textContent = typeof item === 'object' ? item.label : item;
+            ul.appendChild(li);
+        });
+        content.appendChild(ul);
+    }
+
+    panel.classList.remove('hidden');
+}
+
+function hideDetailPanel() {
+    const panel = document.getElementById('kg-detail-panel');
+    if (panel) panel.classList.add('hidden');
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    document.getElementById('kg-detail-close')?.addEventListener('click', () => {
+        hideDetailPanel();
+        kgState.selectedNode = null;
+        d3.selectAll('.kg-node-group').classed('dimmed', false);
+        d3.selectAll('.kg-edge-line').classed('dimmed', false);
+    });
+    document.getElementById('report-view-close')?.addEventListener('click', () => {
+        document.getElementById('report-view-modal')?.classList.add('hidden');
+    });
+});
+
+async function fetchAndRenderLogAnalysis(dtcCode, panel) {
+    try {
+        const res = await fetch(`/api/knowledge-graph/analysis/${encodeURIComponent(dtcCode)}`);
+        if (res.ok) {
+            const data = await res.json();
+            if (data.status === 'success' && data.reports && data.reports.length > 0) {
+                // escapeAttr needs to be used carefully with markdown which contains quotes.
+                // It's safer to store data in a global map or use encodeURIComponent.
+                window.kgCurrentReports = {};
+                panel.innerHTML = data.reports.slice(0, 6).map((r, i) => {
+                    const id = 'rep_' + i;
+                    window.kgCurrentReports[id] = r.markdown;
+                    return `
+                    <div class="kg-rc-item" style="cursor:pointer;" onclick="openReportModal('${escapeAttr(r.title)}', window.kgCurrentReports['${id}'])">
+                        <span class="kg-rc-name" style="color:var(--primary); font-weight:600;">📄 ${escapeHtml(r.title)}</span>
+                        <div style="font-size: 0.75rem; color: var(--text-muted); margin-top:2px;">${escapeHtml(r.date)}</div>
+                    </div>
+                `}).join('');
+            } else {
+                panel.innerHTML = '<div style="padding: 12px; color: var(--text-muted); font-size: 0.82rem; text-align: center;">No analysis reports found for this DTC.<br/>Click "Run AI Analysis" to generate one.</div>';
+            }
+        }
+    } catch (e) {
+        panel.innerHTML = '<div style="padding: 12px; color: #ef4444; font-size: 0.82rem; text-align: center;">Failed to load reports.</div>';
+    }
+}
+
+function openReportModal(title, markdownText) {
+    const modal = document.getElementById('report-view-modal');
+    if (!modal) return;
+    
+    document.getElementById('report-view-title').innerHTML = `
+        <svg fill="none" height="18" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" style="color: var(--primary);" viewbox="0 0 24 24" width="18"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline></svg> 
+        ${title}`;
+        
+    const body = document.getElementById('report-view-body');
+    if (window.marked) {
+        body.innerHTML = marked.parse(markdownText);
+    } else {
+        body.innerText = markdownText;
+    }
+    
+    modal.classList.remove('hidden');
+}
+
 
 // ── Sidebar Rendering ───────────────────────────────────────────
 function renderSidebar(data) {
@@ -404,16 +575,45 @@ function renderBottomPanels(data) {
         jiraPanel.innerHTML = '<div style="padding: 12px; color: var(--text-muted); font-size: 0.82rem; text-align: center;">No Jira/SIMS tickets linked</div>';
     }
 
-    // Root Causes
-    const rcPanel = document.getElementById('kg-panel-rootcauses');
-    if (data.root_causes && data.root_causes.length > 0) {
-        rcPanel.innerHTML = data.root_causes.slice(0, 6).map((rc, i) => `
-            <div class="kg-rc-item">
-                <span class="kg-rc-name">${escapeHtml(rc)}</span>
-            </div>
-        `).join('') + (data.root_causes.length > 6 ? `<div class="kg-panel-footer"><span class="kg-view-all">View Full RCA Analysis →</span></div>` : '');
-    } else {
-        rcPanel.innerHTML = '<div style="padding: 12px; color: var(--text-muted); font-size: 0.82rem; text-align: center;">No root causes identified</div>';
+    // AI Log Analysis
+    const logAnalysisPanel = document.getElementById('kg-panel-log-analysis');
+    const runBtn = document.getElementById('btn-kg-run-analysis');
+    if (logAnalysisPanel && runBtn) {
+        logAnalysisPanel.innerHTML = '<div style="padding: 12px; color: var(--text-muted); font-size: 0.82rem; text-align: center;">Loading...</div>';
+        runBtn.classList.remove('hidden');
+        
+        const dtcCode = data.dtc_overview.code;
+        
+        // Remove previous listeners using cloneNode
+        const newRunBtn = runBtn.cloneNode(true);
+        runBtn.parentNode.replaceChild(newRunBtn, runBtn);
+        
+        newRunBtn.onclick = async () => {
+            newRunBtn.disabled = true;
+            newRunBtn.innerText = "Analyzing...";
+            try {
+                const res = await fetch(`/api/knowledge-graph/analyze/${encodeURIComponent(dtcCode)}`, { method: 'POST' });
+                if (res.ok) {
+                    const ans = await res.json();
+                    if (ans.status === 'success') {
+                        // Reload the panel
+                        fetchAndRenderLogAnalysis(dtcCode, logAnalysisPanel);
+                        // Open the modal right away with the result
+                        openReportModal(`Log Analysis: ${dtcCode}`, ans.report);
+                    }
+                } else {
+                    alert("Analysis failed. See console for details.");
+                }
+            } catch (e) {
+                console.error(e);
+                alert("Error running analysis.");
+            } finally {
+                newRunBtn.disabled = false;
+                newRunBtn.innerText = "Run AI Analysis";
+            }
+        };
+        
+        fetchAndRenderLogAnalysis(dtcCode, logAnalysisPanel);
     }
 
     // Activity Timeline

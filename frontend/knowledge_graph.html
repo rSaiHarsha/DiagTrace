@@ -11,6 +11,8 @@
     <link href="knowledge_graph.css?v=1.0.0" rel="stylesheet"/>
     <!-- D3.js for force-directed graph -->
     <script src="https://d3js.org/d3.v7.min.js"></script>
+    <!-- Marked.js for markdown rendering -->
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
 </head>
 <body>
     <!-- ═══ HEADER ═══ -->
@@ -217,6 +219,16 @@
                         <h3>Select a DTC Code</h3>
                         <p>Search for a DTC above to explore its relationships</p>
                     </div>
+
+                    <!-- Floating Detail Panel -->
+                    <div class="kg-detail-panel hidden" id="kg-detail-panel">
+                        <div class="kg-detail-header">
+                            <span class="kg-detail-type" id="kg-detail-type">Type</span>
+                            <button class="kg-detail-close" id="kg-detail-close">×</button>
+                        </div>
+                        <h3 class="kg-detail-title" id="kg-detail-title">Title</h3>
+                        <div class="kg-detail-content" id="kg-detail-content"></div>
+                    </div>
                 </div>
 
                 <!-- ─── Right Sidebar ─── -->
@@ -292,13 +304,16 @@
                             <div style="padding: 12px; color: var(--text-muted); font-size: 0.82rem; text-align: center;">No data</div>
                         </div>
                     </div>
-                    <!-- Root Causes -->
+                    <!-- AI Log Analysis -->
                     <div class="kg-panel">
-                        <div class="kg-panel-title">
-                            <span class="dot red"></span>
-                            Root Cause Details
+                        <div class="kg-panel-title" style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
+                            <span>
+                                <span class="dot red"></span>
+                                AI Log Analysis
+                            </span>
+                            <button id="btn-kg-run-analysis" class="btn btn-primary btn-small hidden" style="padding: 2px 8px; font-size: 0.75rem;">Run AI Analysis</button>
                         </div>
-                        <div id="kg-panel-rootcauses">
+                        <div id="kg-panel-log-analysis">
                             <div style="padding: 12px; color: var(--text-muted); font-size: 0.82rem; text-align: center;">No data</div>
                         </div>
                     </div>
@@ -316,6 +331,28 @@
 
             </div><!-- .kg-page-layout -->
         </main>
+    </div>
+
+    <!-- REPORT VIEW MODAL -->
+    <div class="modal hidden" id="report-view-modal" style="z-index: 100000;">
+        <div class="modal-content rca-modal-content">
+            <div class="modal-header" style="display: flex; justify-content: space-between; align-items: center; padding: 16px 24px; border-bottom: 1px solid var(--border-color);">
+                <h3 id="report-view-title" style="font-size: 1.1rem; display: flex; align-items: center; gap: 8px; margin: 0;">
+                    <svg fill="none" height="18" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" style="color: var(--primary);" viewbox="0 0 24 24" width="18"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline></svg> Report
+                </h3>
+                <div style="display: flex; align-items: center; gap: 10px;">
+                    <span class="modal-close" id="report-view-close">&times;</span>
+                </div>
+            </div>
+            <div class="modal-body rca-modal-body" style="position: relative; min-height: 200px;">
+                <div class="kg-loading hidden" id="report-view-loading">
+                    <div class="kg-loading-spinner"></div>
+                </div>
+                <div class="markdown-body" id="report-view-body" style="padding: 10px;">
+                    <!-- Report content here -->
+                </div>
+            </div>
+        </div>
     </div>
 
     <!-- Knowledge Graph JS -->

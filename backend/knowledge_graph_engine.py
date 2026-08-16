@@ -197,26 +197,33 @@ def _extract_issue_details(content: str, rag_data: Dict):
                     if p_clean and len(p_clean) > 2:
                         rag_data["programs_affected"].append(p_clean)
 
-    # CSV-style content parsing
-    csv_parts = content.split(",")
-    if len(csv_parts) >= 5:
-        potential_cause = csv_parts[3].strip().strip('"') if len(csv_parts) > 3 else ""
-        potential_reaction = csv_parts[4].strip().strip('"') if len(csv_parts) > 4 else ""
-        potential_severity = csv_parts[5].strip().strip('"') if len(csv_parts) > 5 else ""
-        potential_programs = csv_parts[6].strip().strip('"') if len(csv_parts) > 6 else ""
+    # CSV-style content parsing (only if it's a single line to avoid breaking natural language paragraphs)
+    if len(lines) <= 2 and "," in content:
+        import csv
+        import io
+        try:
+            reader = csv.reader(io.StringIO(content.strip()))
+            csv_parts = next(reader)
+            if len(csv_parts) >= 5:
+                potential_cause = csv_parts[3].strip() if len(csv_parts) > 3 else ""
+                potential_reaction = csv_parts[4].strip() if len(csv_parts) > 4 else ""
+                potential_severity = csv_parts[5].strip() if len(csv_parts) > 5 else ""
+                potential_programs = csv_parts[6].strip() if len(csv_parts) > 6 else ""
 
-        if potential_cause and len(potential_cause) > 10 and "root_cause" not in potential_cause.lower():
-            rag_data["root_causes"].append(potential_cause)
-        if potential_reaction and len(potential_reaction) > 10 and not rag_data["system_reaction"]:
-            rag_data["system_reaction"] = potential_reaction
-        if potential_severity and potential_severity.title() in ["Critical", "High", "Medium", "Low"]:
-            if not rag_data["severity"]:
-                rag_data["severity"] = potential_severity.title()
-        if potential_programs:
-            for p in re.split(r'[;,]', potential_programs):
-                p_clean = p.strip()
-                if p_clean and len(p_clean) > 2:
-                    rag_data["programs_affected"].append(p_clean)
+                if potential_cause and len(potential_cause) > 5 and "root_cause" not in potential_cause.lower():
+                    rag_data["root_causes"].append(potential_cause)
+                if potential_reaction and len(potential_reaction) > 5 and not rag_data["system_reaction"]:
+                    rag_data["system_reaction"] = potential_reaction
+                if potential_severity and potential_severity.title() in ["Critical", "High", "Medium", "Low"]:
+                    if not rag_data["severity"]:
+                        rag_data["severity"] = potential_severity.title()
+                if potential_programs:
+                    for p in re.split(r'[;,]', potential_programs):
+                        p_clean = p.strip()
+                        if p_clean and len(p_clean) > 2:
+                            rag_data["programs_affected"].append(p_clean)
+        except Exception:
+            pass
 
 
 def _deduplicate_list(items: list) -> list:
@@ -433,65 +440,33 @@ def build_knowledge_graph(dtc_code: str) -> Dict[str, Any]:
         })
         edges.append({"source": f"dtc-{code_clean}", "target": desc_id, "label": "describes"})
 
-    # Root Cause nodes
-    for i, cause in enumerate(rag_data["root_causes"][:6]):
-        rc_id = f"rootcause-{i}"
-        nodes.append({
-            "id": rc_id,
-            "label": cause[:50] + ("..." if len(cause) > 50 else ""),
-            "sublabel": cause,
-            "type": "rootcause"
-        })
-        edges.append({"source": f"dtc-{code_clean}", "target": rc_id, "label": "caused by"})
+    # RAG data nodes (Root Causes, System Reaction, Components, Jira) are excluded 
+    # from the visual graph to reduce clutter, but are still returned in the JSON payload
+    # so the bottom panels can display them.
 
-    # System Reaction node
-    if rag_data["system_reaction"]:
-        sr_id = "systemreaction-0"
-        reaction_parts = rag_data["system_reaction"].split(";")
-        nodes.append({
-            "id": sr_id,
-            "label": "System Reaction",
-            "sublabel": rag_data["system_reaction"],
-            "type": "systemreaction",
-            "items": [p.strip() for p in reaction_parts if p.strip()]
-        })
-        edges.append({"source": f"dtc-{code_clean}", "target": sr_id, "label": "triggers"})
-
-    # Components node
-    if rag_data["components"]:
-        comp_id = "components-0"
-        nodes.append({
-            "id": comp_id,
-            "label": "Components",
-            "sublabel": ", ".join(rag_data["components"][:5]),
-            "type": "components",
-            "items": rag_data["components"]
-        })
-        edges.append({"source": f"dtc-{code_clean}", "target": comp_id, "label": "involves"})
 
     # Programs node
     if all_programs:
         prog_id = "programs-0"
+        program_items = []
+        for p in all_programs:
+            program_items.append({
+                "id": f"program-{p}",
+                "label": str(p),
+                "sublabel": "Program",
+                "type": "program"
+            })
+            
         nodes.append({
             "id": prog_id,
             "label": "Affected Programs",
-            "sublabel": ", ".join(all_programs[:4]),
-            "type": "programs",
-            "items": all_programs
+            "sublabel": f"{len(all_programs)} Programs",
+            "type": "group_node",
+            "items": program_items
         })
         edges.append({"source": f"dtc-{code_clean}", "target": prog_id, "label": "affects"})
 
-    # Jira/SIMS node
-    if rag_data["jira_tickets"]:
-        jira_id = "jira-0"
-        nodes.append({
-            "id": jira_id,
-            "label": "SIMS / Jira Tickets",
-            "sublabel": f"{len(rag_data['jira_tickets'])} tickets",
-            "type": "jira",
-            "items": rag_data["jira_tickets"]
-        })
-        edges.append({"source": f"dtc-{code_clean}", "target": jira_id, "label": "tracked in"})
+    # Jira/SIMS node excluded from visual graph to reduce clutter
 
     # Requirements node
     if rag_data["requirements"]:
@@ -550,3 +525,166 @@ def _get_module_full_name(module_code: str) -> str:
         "TPMS": "Tire Pressure Monitoring System",
     }
     return module_map.get(module_code.strip().upper(), f"{module_code} Module")
+
+
+def build_dynamic_graph(entity_type: str, entity_id: str) -> Dict[str, Any]:
+    """
+    Builds a dynamic knowledge graph centered on an entity (module, vin, program, dtc).
+    Groups related entities to prevent graph clutter.
+    """
+    try:
+        df = load_from_db()
+    except Exception:
+        df = None
+
+    if df is None or df.empty:
+        return {"status": "error", "message": "No data available"}
+
+    entity_id_clean = entity_id.strip()
+    
+    if entity_type == "module":
+        mask = df["Module"].str.strip().str.upper() == entity_id_clean.upper()
+    elif entity_type == "vin":
+        if "VIN Number" not in df.columns:
+            return {"status": "error", "message": "No VIN data"}
+        mask = df["VIN Number"].str.strip().str.upper() == entity_id_clean.upper()
+    elif entity_type == "program":
+        if "Program name" not in df.columns:
+            return {"status": "error", "message": "No Program data"}
+        mask = df["Program name"].str.strip().str.upper() == entity_id_clean.upper()
+    elif entity_type == "dtc":
+        return build_knowledge_graph(entity_id)
+    else:
+        return {"status": "error", "message": "Invalid entity type"}
+
+    filtered_df = df[mask]
+    if filtered_df.empty:
+        return {"status": "error", "message": f"No data found for {entity_type} {entity_id}"}
+
+    nodes = []
+    edges = []
+    
+    central_id = f"{entity_type}-{entity_id_clean}"
+    nodes.append({
+        "id": central_id,
+        "label": entity_id_clean,
+        "sublabel": _get_module_full_name(entity_id_clean) if entity_type == "module" else entity_type.title(),
+        "type": entity_type,
+        "fx": 0, "fy": 0
+    })
+
+    if entity_type != "dtc" and "Code" in filtered_df.columns:
+        dtcs = []
+        for code, group in filtered_df.groupby("Code"):
+            if str(code).strip():
+                desc = group["Description"].mode().iloc[0] if "Description" in group.columns and not group["Description"].mode().empty else ""
+                dtcs.append({
+                    "id": f"dtc-{code}",
+                    "label": str(code),
+                    "sublabel": str(desc),
+                    "type": "dtc",
+                    "severity": "Medium"
+                })
+        if dtcs:
+            group_id = "group-dtcs"
+            nodes.append({
+                "id": group_id,
+                "label": "DTCs",
+                "sublabel": f"{len(dtcs)} Codes",
+                "type": "group_node",
+                "items": dtcs
+            })
+            edges.append({"source": central_id, "target": group_id, "label": "has dtc"})
+
+    if entity_type != "module" and "Module" in filtered_df.columns:
+        modules = []
+        for mod in filtered_df["Module"].dropna().unique():
+            if str(mod).strip():
+                modules.append({
+                    "id": f"module-{mod}",
+                    "label": str(mod),
+                    "sublabel": _get_module_full_name(str(mod)),
+                    "type": "module"
+                })
+        if modules:
+            group_id = "group-modules"
+            nodes.append({
+                "id": group_id,
+                "label": "Modules",
+                "sublabel": f"{len(modules)} Modules",
+                "type": "group_node",
+                "items": modules
+            })
+            edges.append({"source": central_id, "target": group_id, "label": "involves"})
+
+    if entity_type != "vin" and "VIN Number" in filtered_df.columns:
+        vins = []
+        for vin in filtered_df["VIN Number"].dropna().unique():
+            if str(vin).strip():
+                vins.append({
+                    "id": f"vin-{vin}",
+                    "label": str(vin),
+                    "sublabel": "Vehicle",
+                    "type": "vin"
+                })
+        if vins:
+            group_id = "group-vins"
+            nodes.append({
+                "id": group_id,
+                "label": "VINs",
+                "sublabel": f"{len(vins)} Vehicles",
+                "type": "group_node",
+                "items": vins
+            })
+            edges.append({"source": central_id, "target": group_id, "label": "found in"})
+            
+    if entity_type != "program" and "Program name" in filtered_df.columns:
+        progs = []
+        for prog in filtered_df["Program name"].dropna().unique():
+            if str(prog).strip():
+                progs.append({
+                    "id": f"program-{prog}",
+                    "label": str(prog),
+                    "sublabel": "Program",
+                    "type": "programs"
+                })
+        if progs:
+            group_id = "group-programs"
+            nodes.append({
+                "id": group_id,
+                "label": "Programs",
+                "sublabel": f"{len(progs)} Programs",
+                "type": "group_node",
+                "items": progs
+            })
+            edges.append({"source": central_id, "target": group_id, "label": "affects"})
+
+    overview = {
+        "code": entity_id_clean,
+        "module": entity_id_clean if entity_type == "module" else "Multiple",
+        "description": f"{entity_type.title()} summary",
+        "severity": "N/A",
+        "status": "Active",
+        "first_seen": "",
+        "last_seen": "",
+        "occurrences": len(filtered_df),
+        "frequency": "High" if len(filtered_df) > 10 else "Low"
+    }
+
+    return {
+        "status": "success",
+        "dtc_overview": overview,
+        "graph": {
+            "nodes": nodes,
+            "edges": edges
+        },
+        "root_causes": [],
+        "system_reaction": "",
+        "components": [],
+        "programs_affected": [],
+        "requirements": [],
+        "jira_tickets": [],
+        "related_dtcs": [],
+        "activity_timeline": []
+    }
+
