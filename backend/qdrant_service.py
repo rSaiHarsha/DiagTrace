@@ -27,7 +27,6 @@ def init_qdrant_storage():
                     created_at TEXT NOT NULL
                 )
             """)
-            cursor.execute("UPDATE rag_knowledge_base SET category = 'System Requirements' WHERE category = 'Jira & Requirements' OR category = 'Jira'")
             conn.commit()
             conn.close()
         except Exception as e:
@@ -93,6 +92,15 @@ def store_knowledge_item(doc_id: str, title: str, category: str, content: str, v
                     collection_name=collection_name,
                     vectors_config=models.VectorParams(size=len(vector), distance=models.Distance.COSINE)
                 )
+            
+            try:
+                client.create_payload_index(
+                    collection_name=collection_name,
+                    field_name="category",
+                    field_schema=models.PayloadSchemaType.KEYWORD
+                )
+            except Exception:
+                pass
             
             client.upsert(
                 collection_name=collection_name,
@@ -243,6 +251,34 @@ def query_rag_context(query_text: str, query_vector: List[float], category: Opti
 def get_all_knowledge_documents() -> List[Dict[str, Any]]:
     """Lists all ingested documents in the RAG knowledge base."""
     init_qdrant_storage()
+    
+    # Try Qdrant Cloud first
+    client = get_qdrant_client()
+    if client:
+        try:
+            records, _ = client.scroll(
+                collection_name="diagtrace_knowledge",
+                limit=1000,
+                with_payload=True,
+                with_vectors=False
+            )
+            docs = []
+            for record in records:
+                payload = record.payload or {}
+                content = payload.get("content", "")
+                docs.append({
+                    "id": payload.get("doc_id", str(record.id)),
+                    "title": payload.get("title", "Unknown Document"),
+                    "category": payload.get("category", "General"),
+                    "created_at": payload.get("created_at", "Unknown"),
+                    "length": len(content)
+                })
+            docs.sort(key=lambda x: x["created_at"], reverse=True)
+            return docs
+        except Exception as e:
+            print(f"Qdrant fetch docs error: {e}")
+
+    # Fallback to SQLite
     with db_lock:
         try:
             conn = get_connection()
@@ -258,6 +294,31 @@ def get_all_knowledge_documents() -> List[Dict[str, Any]]:
 def get_all_knowledge_items_full() -> List[Dict[str, Any]]:
     """Lists all ingested documents with content for fallback keyword search."""
     init_qdrant_storage()
+
+    # Try Qdrant Cloud first
+    client = get_qdrant_client()
+    if client:
+        try:
+            records, _ = client.scroll(
+                collection_name="diagtrace_knowledge",
+                limit=1000,
+                with_payload=True,
+                with_vectors=False
+            )
+            items = []
+            for record in records:
+                payload = record.payload or {}
+                items.append({
+                    "id": payload.get("doc_id", str(record.id)),
+                    "title": payload.get("title", "Unknown"),
+                    "category": payload.get("category", "General"),
+                    "content": payload.get("content", "")
+                })
+            return items
+        except Exception as e:
+            print(f"Qdrant fetch full items error: {e}")
+
+    # Fallback to SQLite
     with db_lock:
         try:
             conn = get_connection()
@@ -273,6 +334,96 @@ def get_all_knowledge_items_full() -> List[Dict[str, Any]]:
 def get_knowledge_chunks(category: Optional[str] = None, search: Optional[str] = None, page: int = 1, page_size: int = 20) -> Dict[str, Any]:
     """Fetches paginated, filtered chunks from the knowledge base."""
     init_qdrant_storage()
+    
+    # Try Qdrant Cloud first
+    client = get_qdrant_client()
+    if client:
+        try:
+            from qdrant_client.http import models
+            query_filter = None
+            
+            # Construct Qdrant category filter
+            if category and category.lower() != "all":
+                cat_lower = category.strip().lower()
+                must_conds = []
+                if cat_lower in ["jira", "jira tickets"]:
+                    must_conds = [models.FieldCondition(key="category", match=models.MatchValue(value="Jira"))]
+                elif cat_lower in ["system requirements", "requirements"]:
+                    must_conds = [models.FieldCondition(key="category", match=models.MatchValue(value="System Requirements"))]
+                else:
+                    must_conds = [models.FieldCondition(key="category", match=models.MatchValue(value=category))]
+                
+                query_filter = models.Filter(must=must_conds)
+
+            chunks = []
+            if search and search.strip():
+                # Perform Semantic Vector Search!
+                from backend.nvidia_client import get_nvidia_embedding
+                query_vector = get_nvidia_embedding(search.strip())
+                
+                if hasattr(client, 'query_points'):
+                    response = client.query_points(
+                        collection_name="diagtrace_knowledge",
+                        query=query_vector,
+                        query_filter=query_filter,
+                        limit=100  # Cap search results
+                    )
+                    hits = response.points
+                else:
+                    hits = client.search(
+                        collection_name="diagtrace_knowledge",
+                        query_vector=query_vector,
+                        query_filter=query_filter,
+                        limit=100
+                    )
+                    
+                for hit in hits:
+                    payload = getattr(hit, 'payload', {}) or {}
+                    chunks.append({
+                        "id": payload.get("doc_id", str(getattr(hit, 'id', ''))),
+                        "title": payload.get("title", "Unknown"),
+                        "category": payload.get("category", "General"),
+                        "content": payload.get("content", ""),
+                        "created_at": payload.get("created_at", "Unknown"),
+                        "score": getattr(hit, 'score', 0)
+                    })
+            else:
+                # Perform Scroll for standard pagination
+                records, _ = client.scroll(
+                    collection_name="diagtrace_knowledge",
+                    scroll_filter=query_filter,
+                    limit=1000,
+                    with_payload=True,
+                    with_vectors=False
+                )
+                for record in records:
+                    payload = record.payload or {}
+                    chunks.append({
+                        "id": payload.get("doc_id", str(record.id)),
+                        "title": payload.get("title", "Unknown"),
+                        "category": payload.get("category", "General"),
+                        "content": payload.get("content", ""),
+                        "created_at": payload.get("created_at", "Unknown")
+                    })
+                # Sort by created_at desc
+                chunks.sort(key=lambda x: x["created_at"], reverse=True)
+
+            # In-memory pagination for Qdrant
+            total_count = len(chunks)
+            start_idx = (page - 1) * page_size
+            end_idx = start_idx + page_size
+            paginated_chunks = chunks[start_idx:end_idx]
+            
+            return {
+                "chunks": paginated_chunks,
+                "total": total_count,
+                "page": page,
+                "page_size": page_size
+            }
+        except Exception as e:
+            print(f"Qdrant fetch chunks error: {e}")
+
+    # Fallback to SQLite
     with db_lock:
         try:
             conn = get_connection()
