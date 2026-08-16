@@ -37,6 +37,7 @@ from backend.rca_engine import (
 from backend.log_analysis_engine import run_log_analysis
 from backend.chatbot_engine import process_chatbot_query, get_chat_session, clear_chat_session
 from backend.nvidia_client import get_nvidia_model, get_nvidia_embed_model, set_nvidia_ai_config
+from backend.knowledge_graph_engine import get_dtc_list, build_knowledge_graph
 
 app = FastAPI(title="Vehicle Diagnostics Parser Engine")
 API_VERSION = "2.0.0"
@@ -558,6 +559,26 @@ def get_chat_history_endpoint(session_id: str = Query(...)):
     """Returns conversation history for a given session."""
     history = get_chat_session(session_id)
     return {"status": "success", "session_id": session_id, "history": history}
+# --- Knowledge Graph API ---
+
+@app.get("/api/knowledge-graph/dtc-list")
+def kg_dtc_list_endpoint():
+    """Returns all unique DTC codes with metadata for the graph selector."""
+    try:
+        dtc_list = get_dtc_list()
+        return {"status": "success", "dtc_list": dtc_list}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to fetch DTC list: {str(e)}")
+
+@app.get("/api/knowledge-graph/{dtc_code}")
+def kg_build_graph_endpoint(dtc_code: str):
+    """Builds and returns the full knowledge graph for a specific DTC code."""
+    try:
+        graph_data = build_knowledge_graph(dtc_code)
+        return graph_data
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to build knowledge graph: {str(e)}")
+
 # --- Saved Reports API ---
 
 @app.get("/api/reports")

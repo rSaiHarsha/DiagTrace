@@ -1,0 +1,324 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8"/>
+    <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+    <title>⚡ DiagTrace - Knowledge Graph</title>
+    <meta name="description" content="DTC Relationship Explorer — Trace diagnostic trouble codes, root causes, requirements, Jira tickets, and affected programs in an interactive knowledge graph."/>
+    <!-- Base Styles -->
+    <link href="style.css?v=2.1.0" rel="stylesheet"/>
+    <!-- Knowledge Graph Styles -->
+    <link href="knowledge_graph.css?v=1.0.0" rel="stylesheet"/>
+    <!-- D3.js for force-directed graph -->
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+</head>
+<body>
+    <!-- ═══ HEADER ═══ -->
+    <header class="app-header">
+        <div class="header-logo">
+            <span class="logo-icon" style="display: flex; align-items: center;">
+                <svg fill="none" height="20" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" style="color: var(--primary);" viewBox="0 0 24 24" width="20">
+                    <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon>
+                </svg>
+            </span>
+            <span class="logo-text">Diag<span class="highlight">Trace</span></span>
+            <span class="version-badge" id="version-badge">v2.1.0</span>
+        </div>
+        <div class="header-status">
+            <span class="status-indicator connected" id="db-status" style="display: flex; align-items: center; gap: 6px;">
+                <svg fill="none" height="14" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewBox="0 0 24 24" width="14">
+                    <ellipse cx="12" cy="5" rx="9" ry="3"></ellipse>
+                    <path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"></path>
+                    <path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"></path>
+                </svg>
+                Database Connected
+            </span>
+            <div class="header-actions-group">
+                <button class="btn btn-secondary btn-small" id="btn-header-profile" style="display: flex; align-items: center; gap: 6px;" title="User Profile">
+                    <svg fill="none" height="14" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewBox="0 0 24 24" width="14">
+                        <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+                        <circle cx="12" cy="7" r="4"></circle>
+                    </svg>
+                    <span id="header-profile-text">Profile</span>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <div class="app-body-wrapper">
+        <!-- ═══ SIDEBAR ═══ -->
+        <aside class="left-sidebar">
+            <nav class="sidebar-nav">
+                <a class="sidebar-link" href="index.html" title="Logs">
+                    <div class="sidebar-icon">
+                        <svg fill="none" height="20" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewBox="0 0 24 24" width="20">
+                            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                            <polyline points="14 2 14 8 20 8"></polyline>
+                            <line x1="16" x2="8" y1="13" y2="13"></line>
+                            <line x1="16" x2="8" y1="17" y2="17"></line>
+                            <polyline points="10 9 9 9 8 9"></polyline>
+                        </svg>
+                    </div>
+                    <span class="sidebar-text">Logs</span>
+                </a>
+                <a class="sidebar-link" href="knowledge_base.html" title="Knowledge Base">
+                    <div class="sidebar-icon">
+                        <svg fill="none" height="20" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewBox="0 0 24 24" width="20">
+                            <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path>
+                            <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path>
+                        </svg>
+                    </div>
+                    <span class="sidebar-text">Knowledge Base</span>
+                </a>
+                <!-- Knowledge Graph (active) -->
+                <a class="sidebar-link active" href="knowledge_graph.html" title="Knowledge Graph">
+                    <div class="sidebar-icon">
+                        <svg fill="none" height="20" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewBox="0 0 24 24" width="20">
+                            <circle cx="12" cy="12" r="3"></circle>
+                            <circle cx="4" cy="6" r="2"></circle>
+                            <circle cx="20" cy="6" r="2"></circle>
+                            <circle cx="4" cy="18" r="2"></circle>
+                            <circle cx="20" cy="18" r="2"></circle>
+                            <line x1="9.5" y1="10.5" x2="5.5" y2="7.5"></line>
+                            <line x1="14.5" y1="10.5" x2="18.5" y2="7.5"></line>
+                            <line x1="9.5" y1="13.5" x2="5.5" y2="16.5"></line>
+                            <line x1="14.5" y1="13.5" x2="18.5" y2="16.5"></line>
+                        </svg>
+                    </div>
+                    <span class="sidebar-text">Knowledge Graph</span>
+                </a>
+                <a class="sidebar-link" href="#" title="Analytics">
+                    <div class="sidebar-icon">
+                        <svg fill="none" height="20" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewBox="0 0 24 24" width="20">
+                            <line x1="18" x2="18" y1="20" y2="10"></line>
+                            <line x1="12" x2="12" y1="20" y2="4"></line>
+                            <line x1="6" x2="6" y1="20" y2="14"></line>
+                        </svg>
+                    </div>
+                    <span class="sidebar-text">Analytics</span>
+                </a>
+                <a class="sidebar-link" href="reports.html" title="Reports">
+                    <div class="sidebar-icon">
+                        <svg fill="none" height="20" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewBox="0 0 24 24" width="20">
+                            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                            <polyline points="14 2 14 8 20 8"></polyline>
+                            <line x1="16" x2="8" y1="13" y2="13"></line>
+                            <line x1="16" x2="8" y1="17" y2="17"></line>
+                            <polyline points="10 9 9 9 8 9"></polyline>
+                        </svg>
+                    </div>
+                    <span class="sidebar-text">Reports</span>
+                </a>
+                <a class="sidebar-link" href="#" title="AI Analysis">
+                    <div class="sidebar-icon">
+                        <svg fill="none" height="20" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewBox="0 0 24 24" width="20">
+                            <rect height="16" rx="2" ry="2" width="16" x="4" y="4"></rect>
+                            <rect height="6" width="6" x="9" y="9"></rect>
+                            <line x1="9" x2="9" y1="1" y2="4"></line>
+                            <line x1="15" x2="15" y1="1" y2="4"></line>
+                            <line x1="9" x2="9" y1="20" y2="23"></line>
+                            <line x1="15" x2="15" y1="20" y2="23"></line>
+                            <line x1="20" x2="23" y1="9" y2="9"></line>
+                            <line x1="20" x2="23" y1="15" y2="15"></line>
+                            <line x1="1" x2="4" y1="9" y2="9"></line>
+                            <line x1="1" x2="4" y1="15" y2="15"></line>
+                        </svg>
+                    </div>
+                    <span class="sidebar-text">AI Analysis</span>
+                </a>
+                <a class="sidebar-link" href="#" title="Settings">
+                    <div class="sidebar-icon">
+                        <svg fill="none" height="20" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewBox="0 0 24 24" width="20">
+                            <circle cx="12" cy="12" r="3"></circle>
+                            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+                        </svg>
+                    </div>
+                    <span class="sidebar-text">Settings</span>
+                </a>
+            </nav>
+        </aside>
+
+        <!-- ═══ MAIN CONTENT ═══ -->
+        <main class="app-container" style="padding: 0; overflow: hidden;">
+            <div class="kg-page-layout">
+
+                <!-- ─── Toolbar ─── -->
+                <div class="kg-toolbar">
+                    <div class="kg-breadcrumb">
+                        <svg fill="none" height="16" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewBox="0 0 24 24" width="16">
+                            <circle cx="12" cy="12" r="3"></circle>
+                            <circle cx="4" cy="6" r="2"></circle>
+                            <circle cx="20" cy="6" r="2"></circle>
+                            <circle cx="4" cy="18" r="2"></circle>
+                            <circle cx="20" cy="18" r="2"></circle>
+                            <line x1="9.5" y1="10.5" x2="5.5" y2="7.5"></line>
+                            <line x1="14.5" y1="10.5" x2="18.5" y2="7.5"></line>
+                            <line x1="9.5" y1="13.5" x2="5.5" y2="16.5"></line>
+                            <line x1="14.5" y1="13.5" x2="18.5" y2="16.5"></line>
+                        </svg>
+                        <span class="bc-active">Knowledge Graph</span>
+                        <svg fill="none" height="12" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" width="12"><polyline points="9 18 15 12 9 6"></polyline></svg>
+                        <span>DTC Relationship Explorer</span>
+                    </div>
+
+                    <div class="kg-search-wrapper">
+                        <input class="kg-search-input" id="kg-search-input" placeholder="Search DTC code, description, or module..." type="text" autocomplete="off"/>
+                        <button class="kg-search-clear" id="kg-search-clear" title="Clear">×</button>
+                        <div class="kg-search-dropdown" id="kg-search-dropdown"></div>
+                    </div>
+
+                    <div class="kg-toolbar-actions">
+                        <div class="kg-view-toggle">
+                            <button class="kg-view-btn active" id="kg-view-graph">
+                                <svg fill="none" height="14" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" width="14"><circle cx="12" cy="12" r="3"></circle><circle cx="4" cy="6" r="2"></circle><circle cx="20" cy="18" r="2"></circle><line x1="9.5" y1="10.5" x2="5.5" y2="7.5"></line><line x1="14.5" y1="13.5" x2="18.5" y2="16.5"></line></svg>
+                                Graph View
+                            </button>
+                            <button class="kg-view-btn" id="kg-view-list">
+                                <svg fill="none" height="14" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" width="14"><line x1="8" y1="6" x2="21" y2="6"></line><line x1="8" y1="12" x2="21" y2="12"></line><line x1="8" y1="18" x2="21" y2="18"></line><line x1="3" y1="6" x2="3.01" y2="6"></line><line x1="3" y1="12" x2="3.01" y2="12"></line><line x1="3" y1="18" x2="3.01" y2="18"></line></svg>
+                                List View
+                            </button>
+                        </div>
+                        <button class="kg-action-btn" id="kg-btn-fit" title="Fit graph to view">
+                            <svg fill="none" height="14" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" width="14"><path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"></path></svg>
+                            Fit View
+                        </button>
+                    </div>
+                </div>
+
+                <!-- ─── Graph Canvas ─── -->
+                <div class="kg-graph-area">
+                    <div class="kg-graph-canvas" id="kg-graph-canvas"></div>
+
+                    <!-- Graph Controls -->
+                    <div class="kg-graph-controls">
+                        <button class="kg-graph-ctrl-btn" id="kg-ctrl-zoom-in" title="Zoom In">+</button>
+                        <button class="kg-graph-ctrl-btn" id="kg-ctrl-zoom-out" title="Zoom Out">−</button>
+                        <button class="kg-graph-ctrl-btn" id="kg-ctrl-reset" title="Reset View">⟳</button>
+                    </div>
+
+                    <!-- Loading -->
+                    <div class="kg-loading" id="kg-loading" style="display: none;">
+                        <div class="kg-loading-spinner"></div>
+                    </div>
+
+                    <!-- Empty State -->
+                    <div class="kg-empty-state" id="kg-empty-state">
+                        <svg fill="none" height="64" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24" width="64">
+                            <circle cx="12" cy="12" r="3"></circle>
+                            <circle cx="4" cy="6" r="2"></circle>
+                            <circle cx="20" cy="6" r="2"></circle>
+                            <circle cx="4" cy="18" r="2"></circle>
+                            <circle cx="20" cy="18" r="2"></circle>
+                            <line x1="9.5" y1="10.5" x2="5.5" y2="7.5"></line>
+                            <line x1="14.5" y1="10.5" x2="18.5" y2="7.5"></line>
+                            <line x1="9.5" y1="13.5" x2="5.5" y2="16.5"></line>
+                            <line x1="14.5" y1="13.5" x2="18.5" y2="16.5"></line>
+                        </svg>
+                        <h3>Select a DTC Code</h3>
+                        <p>Search for a DTC above to explore its relationships</p>
+                    </div>
+                </div>
+
+                <!-- ─── Right Sidebar ─── -->
+                <div class="kg-sidebar">
+                    <!-- DTC Overview -->
+                    <div class="kg-overview-card">
+                        <h3>
+                            <svg fill="none" height="16" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" width="16"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>
+                            DTC Overview
+                        </h3>
+                        <div class="kg-overview-grid">
+                            <span class="label">Code</span>
+                            <span class="value" id="kg-ov-code">—</span>
+                            <span class="label">Severity</span>
+                            <span class="value" id="kg-ov-severity">—</span>
+                            <span class="label">Module</span>
+                            <span class="value" id="kg-ov-module">—</span>
+                            <span class="label">Status</span>
+                            <span class="value" id="kg-ov-status">—</span>
+                            <span class="label">First Seen</span>
+                            <span class="value" id="kg-ov-first-seen">—</span>
+                            <span class="label">Last Seen</span>
+                            <span class="value" id="kg-ov-last-seen">—</span>
+                            <span class="label">Occurrences</span>
+                            <span class="value" id="kg-ov-occurrences">—</span>
+                            <span class="label">Frequency</span>
+                            <span class="value" id="kg-ov-frequency">—</span>
+                        </div>
+                    </div>
+
+                    <!-- Quick Actions -->
+                    <div>
+                        <div class="kg-section-title">Quick Actions</div>
+                        <div class="kg-quick-actions">
+                            <button class="kg-qa-btn" onclick="alert('Run AI RCA — coming soon')">🔍 Run AI RCA</button>
+                            <button class="kg-qa-btn" onclick="window.location.href='index.html'">📊 View Full Analysis</button>
+                            <button class="kg-qa-btn" onclick="window.location.href='reports.html'">📄 Generate Report</button>
+                            <button class="kg-qa-btn" onclick="alert('Add to Watchlist — coming soon')">⭐ Add to Watchlist</button>
+                        </div>
+                    </div>
+
+                    <!-- Related DTCs -->
+                    <div>
+                        <div class="kg-section-title">
+                            Related DTCs
+                            <span class="kg-view-all">View All</span>
+                        </div>
+                        <div class="kg-related-list" id="kg-related-dtcs">
+                            <div style="padding: 8px; color: var(--text-muted); font-size: 0.82rem;">Select a DTC to see related codes</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ─── Bottom Panels ─── -->
+                <div class="kg-bottom-panels">
+                    <!-- Requirements -->
+                    <div class="kg-panel">
+                        <div class="kg-panel-title">
+                            <span class="dot blue"></span>
+                            Manual Documentation (Requirements)
+                        </div>
+                        <div id="kg-panel-requirements">
+                            <div style="padding: 12px; color: var(--text-muted); font-size: 0.82rem; text-align: center;">No data</div>
+                        </div>
+                    </div>
+                    <!-- SIMS / Jira -->
+                    <div class="kg-panel">
+                        <div class="kg-panel-title">
+                            <span class="dot orange"></span>
+                            SIMS / Jira Tickets
+                        </div>
+                        <div id="kg-panel-jira">
+                            <div style="padding: 12px; color: var(--text-muted); font-size: 0.82rem; text-align: center;">No data</div>
+                        </div>
+                    </div>
+                    <!-- Root Causes -->
+                    <div class="kg-panel">
+                        <div class="kg-panel-title">
+                            <span class="dot red"></span>
+                            Root Cause Details
+                        </div>
+                        <div id="kg-panel-rootcauses">
+                            <div style="padding: 12px; color: var(--text-muted); font-size: 0.82rem; text-align: center;">No data</div>
+                        </div>
+                    </div>
+                    <!-- Activity Timeline -->
+                    <div class="kg-panel">
+                        <div class="kg-panel-title">
+                            <span class="dot green"></span>
+                            Activity Timeline
+                        </div>
+                        <div id="kg-panel-timeline">
+                            <div style="padding: 12px; color: var(--text-muted); font-size: 0.82rem; text-align: center;">No data</div>
+                        </div>
+                    </div>
+                </div>
+
+            </div><!-- .kg-page-layout -->
+        </main>
+    </div>
+
+    <!-- Knowledge Graph JS -->
+    <script src="knowledge_graph.js?v=1.0.0"></script>
+</body>
+</html>

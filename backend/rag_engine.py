@@ -112,6 +112,39 @@ def fallback_semantic_chunking(document_text: str, file_name: str) -> List[Dict[
         
     return chunks
 
+def requirements_logical_chunking(document_text: str, file_name: str) -> List[Dict[str, str]]:
+    """Parses requirements documents and chunks each requirement individually for precise RAG retrieval."""
+    chunks = []
+    lines = document_text.splitlines()
+    
+    for line in lines:
+        line = line.strip()
+        # Skip empty lines or CSV headers
+        if not line or "Requirement_ID,Content" in line:
+            continue
+            
+        # Try to extract REQ- ID
+        req_match = re.search(r'(REQ-\d+)', line, re.IGNORECASE)
+        req_id = req_match.group(1).upper() if req_match else "Requirement"
+        
+        # Try to extract DTC reference if any
+        dtc_match = re.search(r'(P[0-9A-Z]{4})', line)
+        dtc_str = f" - Ref: {dtc_match.group(1)}" if dtc_match else ""
+
+        title = f"[{file_name}] {req_id}{dtc_str}"
+        
+        chunks.append({
+            "title": title[:100],
+            "content": line
+        })
+        
+    # If parsing failed to create logical chunks (e.g. no newlines), fallback to semantic chunking
+    if len(chunks) < 2 and len(document_text) > 500:
+        return fallback_semantic_chunking(document_text, file_name)
+        
+    return chunks
+
+
 def process_file_ingestion_background(job_id: str, file_name: str, file_bytes: bytes, category: str):
     """Processes document parsing, LLM semantic chunking, and embedding in the background while reporting live progress."""
     RAG_JOBS[job_id] = {
@@ -144,6 +177,7 @@ def process_file_ingestion_background(job_id: str, file_name: str, file_bytes: b
         ext = os.path.splitext(file_name)[1].lower()
         is_image = ext in ['.png', '.jpg', '.jpeg', '.webp', '.bmp', '.tiff']
         is_architecture = bool(category and "architecture" in category.lower())
+        is_requirements = bool(category and "requirements" in category.lower())
 
         if is_image or is_architecture:
             RAG_JOBS[job_id]["logs"].append("[CHUNK] Creating single unified chunk for ECU Architecture diagram...")
@@ -152,6 +186,10 @@ def process_file_ingestion_background(job_id: str, file_name: str, file_bytes: b
                 "content": raw_text
             }]
             RAG_JOBS[job_id]["logs"].append("[CHUNK] Preserved single unified SysML chunk for complete diagram context")
+        elif is_requirements:
+            RAG_JOBS[job_id]["logs"].append("[CHUNK] Performing Logical Requirements Chunking...")
+            chunks = requirements_logical_chunking(raw_text, file_name)
+            RAG_JOBS[job_id]["logs"].append(f"[CHUNK] Requirements Chunking complete: Generated {len(chunks)} logical chunks")
         else:
             RAG_JOBS[job_id]["logs"].append("[LLM_CHUNK] Performing LLM Semantic Boundary Chunking...")
             chunks = llm_semantic_chunking(raw_text, file_name, job_id=job_id)
