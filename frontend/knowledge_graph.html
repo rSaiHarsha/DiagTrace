@@ -13,6 +13,84 @@
     <script src="https://d3js.org/d3.v7.min.js"></script>
     <!-- Marked.js for markdown rendering -->
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <!-- Inline overrides for the "Expand Graph" full-width layout mode.
+         Kept here (rather than knowledge_graph.css) since that file wasn't
+         available to edit directly — move these rules into the stylesheet
+         whenever convenient. -->
+    <style>
+        .kg-page-layout {
+            position: relative;
+        }
+
+        /* In normal mode, kg-main-row is transparent to layout so the
+           existing CSS grid on .kg-page-layout still controls
+           .kg-graph-area / .kg-sidebar exactly as before. */
+        .kg-main-row {
+            display: contents;
+        }
+
+        /* ── Fullscreen graph mode ── */
+        .kg-page-layout.kg-fullscreen-graph {
+            display: flex !important;
+            flex-direction: column !important;
+            height: 100% !important;
+        }
+
+        .kg-page-layout.kg-fullscreen-graph .kg-toolbar {
+            flex: 0 0 auto;
+        }
+
+        .kg-page-layout.kg-fullscreen-graph .kg-main-row {
+            display: flex !important;
+            flex: 1 1 auto;
+            min-height: 0;
+            overflow: hidden;
+        }
+
+        .kg-page-layout.kg-fullscreen-graph .kg-graph-area {
+            flex: 1 1 auto !important;
+            width: auto !important;
+            height: auto !important;
+            min-width: 0;
+        }
+
+        .kg-page-layout.kg-fullscreen-graph .kg-sidebar {
+            flex: 0 0 360px !important;
+            width: 360px !important;
+            height: auto !important;
+            max-height: 100%;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+            padding-right: 4px;
+        }
+
+        .kg-page-layout.kg-fullscreen-graph .kg-bottom-panels {
+            display: none !important;
+        }
+
+        /* Holds the 3 relocated panels inside the right sidebar */
+        .kg-expanded-panels {
+            display: none;
+            flex-direction: column;
+            gap: 16px;
+        }
+
+        .kg-page-layout.kg-fullscreen-graph .kg-expanded-panels {
+            display: flex;
+        }
+
+        .kg-expand-toggle-btn.active {
+            background: var(--primary);
+            color: #fff;
+            border-color: var(--primary);
+        }
+
+        .kg-jira-row:hover {
+            background: rgba(37, 99, 235, 0.06);
+        }
+    </style>
 </head>
 <body>
     <!-- ═══ HEADER ═══ -->
@@ -142,7 +220,7 @@
 
         <!-- ═══ MAIN CONTENT ═══ -->
         <main class="app-container" style="padding: 0; overflow: hidden;">
-            <div class="kg-page-layout">
+            <div class="kg-page-layout" id="kg-page-layout">
 
                 <!-- ─── Toolbar ─── -->
                 <div class="kg-toolbar">
@@ -180,6 +258,10 @@
                                 List View
                             </button>
                         </div>
+                        <button class="kg-action-btn kg-expand-toggle-btn" id="kg-btn-expand-graph" title="Expand graph to full width">
+                            <svg fill="none" height="14" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" width="14"><polyline points="15 3 21 3 21 9"></polyline><polyline points="9 21 3 21 3 15"></polyline><line x1="21" y1="3" x2="14" y2="10"></line><line x1="3" y1="21" x2="10" y2="14"></line></svg>
+                            <span id="kg-btn-expand-graph-text">Expand Graph</span>
+                        </button>
                         <button class="kg-action-btn" id="kg-btn-fit" title="Fit graph to view">
                             <svg fill="none" height="14" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" width="14"><path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"></path></svg>
                             Fit View
@@ -187,105 +269,113 @@
                     </div>
                 </div>
 
-                <!-- ─── Graph Canvas ─── -->
-                <div class="kg-graph-area">
-                    <div class="kg-graph-canvas" id="kg-graph-canvas"></div>
+                <!-- ─── Graph Area + Right Sidebar (row) ─── -->
+                <div class="kg-main-row" id="kg-main-row">
 
-                    <!-- Graph Controls -->
-                    <div class="kg-graph-controls">
-                        <button class="kg-graph-ctrl-btn" id="kg-ctrl-zoom-in" title="Zoom In">+</button>
-                        <button class="kg-graph-ctrl-btn" id="kg-ctrl-zoom-out" title="Zoom Out">−</button>
-                        <button class="kg-graph-ctrl-btn" id="kg-ctrl-reset" title="Reset View">⟳</button>
-                    </div>
+                    <!-- ─── Graph Canvas ─── -->
+                    <div class="kg-graph-area">
+                        <div class="kg-graph-canvas" id="kg-graph-canvas"></div>
 
-                    <!-- Loading -->
-                    <div class="kg-loading" id="kg-loading" style="display: none;">
-                        <div class="kg-loading-spinner"></div>
-                    </div>
-
-                    <!-- Empty State -->
-                    <div class="kg-empty-state" id="kg-empty-state">
-                        <svg fill="none" height="64" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24" width="64">
-                            <circle cx="12" cy="12" r="3"></circle>
-                            <circle cx="4" cy="6" r="2"></circle>
-                            <circle cx="20" cy="6" r="2"></circle>
-                            <circle cx="4" cy="18" r="2"></circle>
-                            <circle cx="20" cy="18" r="2"></circle>
-                            <line x1="9.5" y1="10.5" x2="5.5" y2="7.5"></line>
-                            <line x1="14.5" y1="10.5" x2="18.5" y2="7.5"></line>
-                            <line x1="9.5" y1="13.5" x2="5.5" y2="16.5"></line>
-                            <line x1="14.5" y1="13.5" x2="18.5" y2="16.5"></line>
-                        </svg>
-                        <h3>Select a DTC Code</h3>
-                        <p>Search for a DTC above to explore its relationships</p>
-                    </div>
-
-                    <!-- Floating Detail Panel -->
-                    <div class="kg-detail-panel hidden" id="kg-detail-panel">
-                        <div class="kg-detail-header">
-                            <span class="kg-detail-type" id="kg-detail-type">Type</span>
-                            <button class="kg-detail-close" id="kg-detail-close">×</button>
+                        <!-- Graph Controls -->
+                        <div class="kg-graph-controls">
+                            <button class="kg-graph-ctrl-btn" id="kg-ctrl-zoom-in" title="Zoom In">+</button>
+                            <button class="kg-graph-ctrl-btn" id="kg-ctrl-zoom-out" title="Zoom Out">−</button>
+                            <button class="kg-graph-ctrl-btn" id="kg-ctrl-reset" title="Reset View">⟳</button>
                         </div>
-                        <h3 class="kg-detail-title" id="kg-detail-title">Title</h3>
-                        <div class="kg-detail-content" id="kg-detail-content"></div>
-                    </div>
-                </div>
 
-                <!-- ─── Right Sidebar ─── -->
-                <div class="kg-sidebar">
-                    <!-- DTC Overview -->
-                    <div class="kg-overview-card">
-                        <h3>
-                            <svg fill="none" height="16" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" width="16"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>
-                            DTC Overview
-                        </h3>
-                        <div class="kg-overview-grid">
-                            <span class="label">Code</span>
-                            <span class="value" id="kg-ov-code">—</span>
-                            <span class="label">Severity</span>
-                            <span class="value" id="kg-ov-severity">—</span>
-                            <span class="label">Module</span>
-                            <span class="value" id="kg-ov-module">—</span>
-                            <span class="label">Status</span>
-                            <span class="value" id="kg-ov-status">—</span>
-                            <span class="label">First Seen</span>
-                            <span class="value" id="kg-ov-first-seen">—</span>
-                            <span class="label">Last Seen</span>
-                            <span class="value" id="kg-ov-last-seen">—</span>
-                            <span class="label">Occurrences</span>
-                            <span class="value" id="kg-ov-occurrences">—</span>
-                            <span class="label">Frequency</span>
-                            <span class="value" id="kg-ov-frequency">—</span>
+                        <!-- Loading -->
+                        <div class="kg-loading" id="kg-loading" style="display: none;">
+                            <div class="kg-loading-spinner"></div>
+                        </div>
+
+                        <!-- Empty State -->
+                        <div class="kg-empty-state" id="kg-empty-state">
+                            <svg fill="none" height="64" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24" width="64">
+                                <circle cx="12" cy="12" r="3"></circle>
+                                <circle cx="4" cy="6" r="2"></circle>
+                                <circle cx="20" cy="6" r="2"></circle>
+                                <circle cx="4" cy="18" r="2"></circle>
+                                <circle cx="20" cy="18" r="2"></circle>
+                                <line x1="9.5" y1="10.5" x2="5.5" y2="7.5"></line>
+                                <line x1="14.5" y1="10.5" x2="18.5" y2="7.5"></line>
+                                <line x1="9.5" y1="13.5" x2="5.5" y2="16.5"></line>
+                                <line x1="14.5" y1="13.5" x2="18.5" y2="16.5"></line>
+                            </svg>
+                            <h3>Select a DTC Code</h3>
+                            <p>Search for a DTC above to explore its relationships</p>
+                        </div>
+
+                        <!-- Floating Detail Panel -->
+                        <div class="kg-detail-panel hidden" id="kg-detail-panel">
+                            <div class="kg-detail-header">
+                                <span class="kg-detail-type" id="kg-detail-type">Type</span>
+                                <button class="kg-detail-close" id="kg-detail-close">×</button>
+                            </div>
+                            <h3 class="kg-detail-title" id="kg-detail-title">Title</h3>
+                            <div class="kg-detail-content" id="kg-detail-content"></div>
                         </div>
                     </div>
 
-                    <!-- Quick Actions -->
-                    <div>
-                        <div class="kg-section-title">Quick Actions</div>
-                        <div class="kg-quick-actions">
-                            <button class="kg-qa-btn" onclick="alert('Run AI RCA — coming soon')">🔍 Run AI RCA</button>
-                            <button class="kg-qa-btn" onclick="window.location.href='index.html'">📊 View Full Analysis</button>
-                            <button class="kg-qa-btn" onclick="window.location.href='reports.html'">📄 Generate Report</button>
-                            <button class="kg-qa-btn" onclick="alert('Add to Watchlist — coming soon')">⭐ Add to Watchlist</button>
+                    <!-- ─── Right Sidebar ─── -->
+                    <div class="kg-sidebar" id="kg-sidebar">
+                        <!-- DTC Overview -->
+                        <div class="kg-overview-card">
+                            <h3>
+                                <svg fill="none" height="16" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" width="16"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>
+                                DTC Overview
+                            </h3>
+                            <div class="kg-overview-grid">
+                                <span class="label">Code</span>
+                                <span class="value" id="kg-ov-code">—</span>
+                                <span class="label">Severity</span>
+                                <span class="value" id="kg-ov-severity">—</span>
+                                <span class="label">Module</span>
+                                <span class="value" id="kg-ov-module">—</span>
+                                <span class="label">Status</span>
+                                <span class="value" id="kg-ov-status">—</span>
+                                <span class="label">First Seen</span>
+                                <span class="value" id="kg-ov-first-seen">—</span>
+                                <span class="label">Last Seen</span>
+                                <span class="value" id="kg-ov-last-seen">—</span>
+                                <span class="label">Occurrences</span>
+                                <span class="value" id="kg-ov-occurrences">—</span>
+                                <span class="label">Frequency</span>
+                                <span class="value" id="kg-ov-frequency">—</span>
+                            </div>
                         </div>
+
+                        <!-- Quick Actions -->
+                        <div>
+                            <div class="kg-section-title">Quick Actions</div>
+                            <div class="kg-quick-actions">
+                                <button class="kg-qa-btn" onclick="alert('Run AI RCA — coming soon')">🔍 Run AI RCA</button>
+                                <button class="kg-qa-btn" onclick="window.location.href='index.html'">📊 View Full Analysis</button>
+                                <button class="kg-qa-btn" onclick="window.location.href='reports.html'">📄 Generate Report</button>
+                                <button class="kg-qa-btn" onclick="alert('Add to Watchlist — coming soon')">⭐ Add to Watchlist</button>
+                            </div>
+                        </div>
+
+                        <!-- Related DTCs -->
+                        <div>
+                            <div class="kg-section-title">
+                                Related DTCs
+                                <span class="kg-view-all">View All</span>
+                            </div>
+                            <div class="kg-related-list" id="kg-related-dtcs">
+                                <div style="padding: 8px; color: var(--text-muted); font-size: 0.82rem;">Select a DTC to see related codes</div>
+                            </div>
+                        </div>
+
+                        <!-- Relocated panels land here in Expand Graph mode -->
+                        <div class="kg-expanded-panels" id="kg-expanded-panels"></div>
                     </div>
 
-                    <!-- Related DTCs -->
-                    <div>
-                        <div class="kg-section-title">
-                            Related DTCs
-                            <span class="kg-view-all">View All</span>
-                        </div>
-                        <div class="kg-related-list" id="kg-related-dtcs">
-                            <div style="padding: 8px; color: var(--text-muted); font-size: 0.82rem;">Select a DTC to see related codes</div>
-                        </div>
-                    </div>
-                </div>
+                </div><!-- .kg-main-row -->
 
                 <!-- ─── Bottom Panels ─── -->
-                <div class="kg-bottom-panels">
+                <div class="kg-bottom-panels" id="kg-bottom-panels">
                     <!-- Requirements -->
-                    <div class="kg-panel">
+                    <div class="kg-panel" id="kg-panel-wrap-requirements">
                         <div class="kg-panel-title">
                             <span class="dot blue"></span>
                             Manual Documentation (Requirements)
@@ -295,7 +385,7 @@
                         </div>
                     </div>
                     <!-- SIMS / Jira -->
-                    <div class="kg-panel">
+                    <div class="kg-panel" id="kg-panel-wrap-jira">
                         <div class="kg-panel-title">
                             <span class="dot orange"></span>
                             SIMS / Jira Tickets
@@ -305,7 +395,7 @@
                         </div>
                     </div>
                     <!-- AI Log Analysis -->
-                    <div class="kg-panel">
+                    <div class="kg-panel" id="kg-panel-wrap-loganalysis">
                         <div class="kg-panel-title" style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
                             <span>
                                 <span class="dot red"></span>
@@ -318,7 +408,7 @@
                         </div>
                     </div>
                     <!-- Activity Timeline -->
-                    <div class="kg-panel">
+                    <div class="kg-panel" id="kg-panel-wrap-timeline">
                         <div class="kg-panel-title">
                             <span class="dot green"></span>
                             Activity Timeline
@@ -354,22 +444,24 @@
             </div>
         </div>
     </div>
-<!-- TICKET DETAIL MODAL -->
-<div class="modal hidden" id="ticket-detail-modal" style="z-index: 100000;">
-    <div class="modal-content rca-modal-content" style="max-width: 560px;">
-        <div class="modal-header" style="display: flex; justify-content: space-between; align-items: center; padding: 16px 24px; border-bottom: 1px solid var(--border-color);">
-            <h3 id="ticket-detail-title" style="font-size: 1.1rem; display: flex; align-items: center; gap: 8px; margin: 0;">
-                <svg fill="none" height="18" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" style="color: var(--primary);" viewBox="0 0 24 24" width="18"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
-                Ticket
-            </h3>
-            <span class="modal-close" id="ticket-detail-close">&times;</span>
-        </div>
-        <div class="modal-body rca-modal-body" id="ticket-detail-body" style="padding: 24px;">
-            <!-- Populated dynamically -->
+
+    <!-- TICKET DETAIL MODAL -->
+    <div class="modal hidden" id="ticket-detail-modal" style="z-index: 100000;">
+        <div class="modal-content rca-modal-content" style="max-width: 560px;">
+            <div class="modal-header" style="display: flex; justify-content: space-between; align-items: center; padding: 16px 24px; border-bottom: 1px solid var(--border-color);">
+                <h3 id="ticket-detail-title" style="font-size: 1.1rem; display: flex; align-items: center; gap: 8px; margin: 0;">
+                    <svg fill="none" height="18" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" style="color: var(--primary);" viewBox="0 0 24 24" width="18"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
+                    Ticket
+                </h3>
+                <span class="modal-close" id="ticket-detail-close">&times;</span>
+            </div>
+            <div class="modal-body rca-modal-body" id="ticket-detail-body" style="padding: 24px;">
+                <!-- Populated dynamically -->
+            </div>
         </div>
     </div>
-</div>
+
     <!-- Knowledge Graph JS -->
-    <script src="knowledge_graph.js?v=1.0.0"></script>
+    <script src="knowledge_graph.js?v=1.1.0"></script>
 </body>
 </html>
