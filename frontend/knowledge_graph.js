@@ -13,7 +13,8 @@ let kgState = {
     selectedNode: null,
     rawNodes: [],
     rawEdges: [],
-    expandedGroups: {}
+    expandedGroups: {},
+    fullscreenGraph: false
 };
 
 // ── Initialization ──────────────────────────────────────────────
@@ -132,7 +133,7 @@ function selectEntity(type, id) {
                 kgState.rawNodes = [...data.graph.nodes];
                 kgState.rawEdges = [...data.graph.edges];
                 kgState.expandedGroups = {};
-                
+
                 hideDetailPanel();
                 renderGraph(data.graph);
                 renderSidebar(data);
@@ -339,7 +340,7 @@ function onNodeClick(d) {
     if (d.type === 'group_node') return;
 
     const focusableTypes = ['dtc', 'related_dtc', 'module', 'vin', 'programs', 'program'];
-    
+
     if (focusableTypes.includes(d.type)) {
         // If clicking the currently focused node, just collapse groups
         if (kgState.currentDtc === d.label || kgState.currentDtc === d.id) {
@@ -382,7 +383,7 @@ function onNodeClick(d) {
         e => (e.source.id === d.id && e.target.id === n.id) || (e.target.id === d.id && e.source.id === n.id)
     ))).classed('dimmed', false);
 
-    d3.selectAll('.kg-edge-line').filter(e => 
+    d3.selectAll('.kg-edge-line').filter(e =>
         e.source.id === d.id || e.target.id === d.id
     ).classed('dimmed', false);
 }
@@ -391,13 +392,13 @@ function onNodeDblClick(d) {
     if (d.type === 'group_node') {
         // Expand
         kgState.expandedGroups[d.id] = true;
-        
+
         let newNodes = kgState.rawNodes.filter(n => !kgState.expandedGroups[n.id]);
         let newEdges = kgState.rawEdges.filter(e => {
             let targetId = e.target.id || e.target;
             return !kgState.expandedGroups[targetId];
         });
-        
+
         for (let gid in kgState.expandedGroups) {
             let group = kgState.rawNodes.find(n => n.id === gid);
             if (group && group.items) {
@@ -414,7 +415,7 @@ function onNodeDblClick(d) {
                 });
             }
         }
-        
+
         renderGraph({nodes: newNodes, edges: newEdges});
     }
 }
@@ -426,14 +427,14 @@ function showDetailPanel(d) {
 
     document.getElementById('kg-detail-type').textContent = (d.type || 'unknown').replace('_', ' ');
     document.getElementById('kg-detail-title').textContent = d.label || 'Details';
-    
+
     const content = document.getElementById('kg-detail-content');
     content.innerHTML = '';
 
     if (d.sublabel) {
         content.innerHTML += `<p><strong>${d.sublabel}</strong></p>`;
     }
-    
+
     if (d.items && Array.isArray(d.items) && d.items.length > 0) {
         let ul = document.createElement('ul');
         ul.className = 'kg-detail-list';
@@ -463,6 +464,7 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('report-view-close')?.addEventListener('click', () => {
         document.getElementById('report-view-modal')?.classList.add('hidden');
     });
+    document.getElementById('ticket-detail-close')?.addEventListener('click', closeTicketModal);
 });
 
 async function fetchAndRenderLogAnalysis(dtcCode, panel) {
@@ -495,21 +497,53 @@ async function fetchAndRenderLogAnalysis(dtcCode, panel) {
 function openReportModal(title, markdownText) {
     const modal = document.getElementById('report-view-modal');
     if (!modal) return;
-    
+
     document.getElementById('report-view-title').innerHTML = `
-        <svg fill="none" height="18" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" style="color: var(--primary);" viewbox="0 0 24 24" width="18"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline></svg> 
+        <svg fill="none" height="18" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" style="color: var(--primary);" viewbox="0 0 24 24" width="18"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline></svg>
         ${title}`;
-        
+
     const body = document.getElementById('report-view-body');
     if (window.marked) {
         body.innerHTML = marked.parse(markdownText);
     } else {
         body.innerText = markdownText;
     }
-    
+
     modal.classList.remove('hidden');
 }
 
+// ── Ticket Detail Modal ─────────────────────────────────────────
+function openTicketModal(ticket) {
+    const modal = document.getElementById('ticket-detail-modal');
+    if (!modal || !ticket) return;
+
+    document.getElementById('ticket-detail-title').innerHTML = `
+        <svg fill="none" height="18" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" style="color: var(--primary);" viewBox="0 0 24 24" width="18"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
+        ${escapeHtml(ticket.ticket_id)}`;
+
+    const statusClass = (ticket.status || '').toLowerCase().replace(/\s/g, '-');
+    const priorityColor = getSeverityColor(ticket.priority); // reuses Critical/High/Medium/Low color map
+
+    document.getElementById('ticket-detail-body').innerHTML = `
+        <h4 style="margin: 0 0 16px 0; font-size: 1.05rem; color: var(--text-primary); line-height: 1.4;">${escapeHtml(ticket.title || 'Untitled Ticket')}</h4>
+        <div class="kg-overview-grid" style="grid-template-columns: 110px 1fr;">
+            <span class="label">Ticket ID</span>
+            <span class="value">${escapeHtml(ticket.ticket_id) || '—'}</span>
+            <span class="label">Status</span>
+            <span class="value"><span class="kg-badge ${statusClass}">${escapeHtml(ticket.status) || 'Open'}</span></span>
+            <span class="label">Priority</span>
+            <span class="value" style="color:${priorityColor}; font-weight:700;">${escapeHtml(ticket.priority) || 'Medium'}</span>
+            <span class="label">Assignee</span>
+            <span class="value">${ticket.assignee ? escapeHtml(ticket.assignee) : '<span style="color:var(--text-muted);">Unassigned</span>'}</span>
+        </div>
+    `;
+
+    modal.classList.remove('hidden');
+}
+
+function closeTicketModal() {
+    document.getElementById('ticket-detail-modal')?.classList.add('hidden');
+}
 
 // ── Sidebar Rendering ───────────────────────────────────────────
 function renderSidebar(data) {
@@ -557,9 +591,12 @@ function renderBottomPanels(data) {
     // Jira/SIMS Tickets
     const jiraPanel = document.getElementById('kg-panel-jira');
     if (data.jira_tickets && data.jira_tickets.length > 0) {
+        window.kgCurrentTickets = {};
         let html = '<table class="kg-jira-table"><thead><tr><th>Ticket ID</th><th>Title</th><th>Status</th><th>Priority</th></tr></thead><tbody>';
-        data.jira_tickets.slice(0, 5).forEach(t => {
-            html += `<tr>
+        data.jira_tickets.slice(0, 5).forEach((t, i) => {
+            const id = 'tix_' + i;
+            window.kgCurrentTickets[id] = t;
+            html += `<tr class="kg-jira-row" style="cursor:pointer;" onclick="openTicketModal(window.kgCurrentTickets['${id}'])">
                 <td style="font-weight:600;color:var(--primary);">${escapeHtml(t.ticket_id)}</td>
                 <td>${escapeHtml(t.title)}</td>
                 <td><span class="kg-badge ${t.status.toLowerCase().replace(/\s/g, '-')}">${escapeHtml(t.status)}</span></td>
@@ -581,13 +618,13 @@ function renderBottomPanels(data) {
     if (logAnalysisPanel && runBtn) {
         logAnalysisPanel.innerHTML = '<div style="padding: 12px; color: var(--text-muted); font-size: 0.82rem; text-align: center;">Loading...</div>';
         runBtn.classList.remove('hidden');
-        
+
         const dtcCode = data.dtc_overview.code;
-        
+
         // Remove previous listeners using cloneNode
         const newRunBtn = runBtn.cloneNode(true);
         runBtn.parentNode.replaceChild(newRunBtn, runBtn);
-        
+
         newRunBtn.onclick = async () => {
             newRunBtn.disabled = true;
             newRunBtn.innerText = "Analyzing...";
@@ -612,7 +649,7 @@ function renderBottomPanels(data) {
                 newRunBtn.innerText = "Run AI Analysis";
             }
         };
-        
+
         fetchAndRenderLogAnalysis(dtcCode, logAnalysisPanel);
     }
 
@@ -646,6 +683,9 @@ function initToolbarActions() {
 
     const resetBtn = document.getElementById('kg-ctrl-reset');
     if (resetBtn) resetBtn.addEventListener('click', fitGraph);
+
+    const expandBtn = document.getElementById('kg-btn-expand-graph');
+    if (expandBtn) expandBtn.addEventListener('click', toggleFullscreenGraph);
 }
 
 function fitGraph() {
@@ -662,6 +702,70 @@ function fitGraph() {
 function zoomGraph(factor) {
     if (!kgState.svg || !kgState.zoom) return;
     kgState.svg.transition().duration(300).call(kgState.zoom.scaleBy, factor);
+}
+
+// ── Expand Graph (fullscreen layout) ────────────────────────────
+// Moves the Requirements / SIMS-Jira / AI Log Analysis panels out of the
+// bottom row and into the right sidebar so the graph can take up the
+// freed-up space. Activity Timeline intentionally stays at the bottom.
+const KG_MOVABLE_PANEL_IDS = [
+    'kg-panel-wrap-requirements',
+    'kg-panel-wrap-jira',
+    'kg-panel-wrap-loganalysis'
+];
+
+function toggleFullscreenGraph() {
+    const layout = document.getElementById('kg-page-layout');
+    const btn = document.getElementById('kg-btn-expand-graph');
+    const btnText = document.getElementById('kg-btn-expand-graph-text');
+    const expandedSlot = document.getElementById('kg-expanded-panels');
+    const bottomPanels = document.getElementById('kg-bottom-panels');
+    const timelineWrap = document.getElementById('kg-panel-wrap-timeline');
+    if (!layout || !expandedSlot || !bottomPanels) return;
+
+    kgState.fullscreenGraph = !kgState.fullscreenGraph;
+    layout.classList.toggle('kg-fullscreen-graph', kgState.fullscreenGraph);
+    btn?.classList.toggle('active', kgState.fullscreenGraph);
+    if (btnText) {
+        btnText.textContent = kgState.fullscreenGraph ? 'Collapse Graph' : 'Expand Graph';
+    }
+    if (btn) {
+        const svg = btn.querySelector('svg');
+        if (svg) {
+            svg.innerHTML = kgState.fullscreenGraph
+                ? '<polyline points="4 14 10 14 10 20"></polyline><polyline points="20 10 14 10 14 4"></polyline><line x1="14" y1="10" x2="21" y2="3"></line><line x1="3" y1="21" x2="10" y2="14"></line>'
+                : '<polyline points="15 3 21 3 21 9"></polyline><polyline points="9 21 3 21 3 15"></polyline><line x1="21" y1="3" x2="14" y2="10"></line><line x1="3" y1="21" x2="10" y2="14"></line>';
+        }
+    }
+
+    if (kgState.fullscreenGraph) {
+        // Move the 3 panels into the sidebar, preserving order
+        KG_MOVABLE_PANEL_IDS.forEach(id => {
+            const el = document.getElementById(id);
+            if (el) expandedSlot.appendChild(el);
+        });
+    } else {
+        // Restore original order ahead of the (never-moved) timeline panel
+        KG_MOVABLE_PANEL_IDS.forEach(id => {
+            const el = document.getElementById(id);
+            if (!el) return;
+            if (timelineWrap) {
+                bottomPanels.insertBefore(el, timelineWrap);
+            } else {
+                bottomPanels.appendChild(el);
+            }
+        });
+    }
+
+    // Let the layout settle, then resize the D3 canvas to fit the new
+    // graph area dimensions.
+    requestAnimationFrame(() => {
+        setTimeout(() => {
+            if (kgState.graphData) {
+                renderGraph(kgState.graphData.graph);
+            }
+        }, 60);
+    });
 }
 
 // ── Utilities ───────────────────────────────────────────────────
