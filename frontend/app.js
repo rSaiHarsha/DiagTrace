@@ -266,6 +266,10 @@ function initApp() {
     const urlParams = new URLSearchParams(window.location.search);
     if (urlParams.get('open') === 'rca') {
         openRcaModal();
+    } else if (urlParams.get('open') === 'settings') {
+        openSettingsModal();
+    } else if (urlParams.get('open') === 'profile') {
+        openProfileModal();
     }
     
     window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => {
