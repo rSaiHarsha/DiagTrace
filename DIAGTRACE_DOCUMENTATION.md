@@ -59,77 +59,173 @@ In automotive engineering, vehicles generate hundreds of **Diagnostic Trouble Co
 
 ## 2. System Architecture
 
-```
-+------------------------------------------------------------------------+
-|                        DiagTrace System                                |
-|                                                                        |
-|  +------------------------------------------------------------------+  |
-|  |                  FRONTEND (Browser — Multi-Page SPA)             |  |
-|  |                                                                  |  |
-|  |  index.html + app.js + style.css + chart.js (bundled, offline)  |  |
-|  |  ┌─────────────────────────────────────────────────────────┐    |  |
-|  |  │ Diagnostic Registry Table  │  Dashboard Charts (KPIs)   │    |  |
-|  |  │ Folder Explorer (Svr/Local)│  AI Chat Panel (+ Memory)  │    |  |
-|  |  │ Per-File RCA selector      │  User Auth (Sign-In/Up)    │    |  |
-|  |  └─────────────────────────────────────────────────────────┘    |  |
-|  |                                                                  |  |
-|  |  knowledge_base.html + knowledge_base.js                        |  |
-|  |  ┌──────────────────────────────────────────────────────────┐   |  |
-|  |  │ Upload Docs (PDF/DOCX/IMG/TXT/JSON) │ Chunk Viewer       │   |  |
-|  |  │ Live Ingestion Progress Log          │ Delete Chunks      │   |  |
-|  |  └──────────────────────────────────────────────────────────┘   |  |
-|  |                                                                  |  |
-|  |  knowledge_graph.html + knowledge_graph.js + knowledge_graph.css|  |
-|  |  ┌──────────────────────────────────────────────────────────┐   |  |
-|  |  │ D3.js Force-Directed Graph │ DTC/Module/VIN Explorer     │   |  |
-|  |  │ Root Causes Panel          │ Jira/SIMS Tickets Panel     │   |  |
-|  |  │ Requirements Panel         │ Activity Timeline           │   |  |
-|  |  │ Expand Graph (Fullscreen)  │ On-Demand AI Analysis       │   |  |
-|  |  └──────────────────────────────────────────────────────────┘   |  |
-|  |                                                                  |  |
-|  |  reports.html + reports.js                                      |  |
-|  |  ┌──────────────────────────────────────────────────────────┐   |  |
-|  |  │ Saved RCA + LOG Report Cards │ Markdown + Chart Viewer   │   |  |
-|  |  │ Search / Filter              │ PDF Download (html2pdf.js) │   |  |
-|  |  └──────────────────────────────────────────────────────────┘   |  |
-|  +------------------------------------------------------------------+  |
-|                              │ HTTP REST API                           |
-|  +---------------------------▼----------------------------------------+  |
-|  |                 BACKEND (FastAPI / Python)                        |  |
-|  |                                                                  |  |
-|  |  ┌─────────────┐  ┌─────────────┐  ┌──────────────────────┐    |  |
-|  |  │  parser.py  │  │ database.py │  │    rag_engine.py      │    |  |
-|  |  │ (CSV + KV)  │  │  (SQLite)   │  │ (chunk + embed)       │    |  |
-|  |  └─────────────┘  └──────┬──────┘  └──────────┬───────────┘    |  |
-|  |                           │                    │                 |  |
-|  |  ┌─────────────┐  ┌──────▼──────┐  ┌──────────▼───────────┐    |  |
-|  |  │ rca_engine  │  │  SQLite DB  │  │   qdrant_service.py   │    |  |
-|  |  │(fleet+file) │  │  (WAL mode) │  │  (Cloud / SQLite FB)  │    |  |
-|  |  │ per-file    │  │  6 tables   │  └──────────┬───────────┘    |  |
-|  |  │ quick-stats │  └─────────────┘             │                 |  |
-|  |  └─────────────┘                       ┌──────▼──────┐         |  |
-|  |                                         │ Qdrant Cloud│         |  |
-|  |  ┌──────────────────┐  ┌─────────────┐ │ Vector DB   │         |  |
-|  |  │log_analysis_     │  │chatbot_     │ └─────────────┘         |  |
-|  |  │engine.py         │  │engine.py    │                          |  |
-|  |  │(3-tier RAG)      │  │(session mem)│                          |  |
-|  |  └──────────────────┘  └─────────────┘                         |  |
-|  |                                                                  |  |
-|  |  ┌──────────────────────┐  ┌──────────────────────────────────┐ |  |
-|  |  │knowledge_graph_      │  │        NVIDIA NIM AI APIs         │ |  |
-|  |  │engine.py             │  │  LLM    : openai/gpt-oss-20b      │ |  |
-|  |  │(graph data builder)  │  │  Embed  : nv-embedqa-e5-v5 (128d) │ |  |
-|  |  └──────────────────────┘  │  Vision : llama-3.2-vision        │ |  |
-|  |                             │           (OCR + SysML convert)   │ |  |
-|  |  ┌──────────────────────┐  └──────────────────────────────────┘ |  |
-|  |  │document_parser.py    │                                        |  |
-|  |  │(PDF/DOCX/IMG/JSON)   │  ┌──────────────────────────────────┐ |  |
-|  |  │ PyMuPDF + Vision OCR │  │      nvidia_client.py            │ |  |
-|  |  │ SysML converter      │  │  LLM / Embed / Vision API client │ |  |
-|  |  └──────────────────────┘  │  503 retry + abort_event support │ |  |
-|  |                             └──────────────────────────────────┘ |  |
-|  +------------------------------------------------------------------+  |
-+------------------------------------------------------------------------+
+```plantuml
+@startuml DiagTrace_Architecture
+!theme cerulean
+skinparam backgroundColor #1a1a2e
+skinparam defaultFontColor #e0e0e0
+skinparam defaultFontName Inter
+skinparam componentStyle rectangle
+skinparam packageStyle frame
+skinparam ArrowColor #7c83ff
+skinparam RoundCorner 12
+skinparam Padding 6
+skinparam PackageBorderColor #3a3a5c
+skinparam PackageBackgroundColor #22223b
+skinparam ComponentBorderColor #4a4a6a
+skinparam ComponentBackgroundColor #2d2d48
+skinparam DatabaseBorderColor #4a9eff
+skinparam DatabaseBackgroundColor #1e3a5f
+skinparam CloudBorderColor #ff6b8a
+skinparam CloudBackgroundColor #3d1f2f
+skinparam NoteBorderColor #4a6a4a
+skinparam NoteBackgroundColor #2a3a2a
+
+title ⚡ DiagTrace — System Architecture (v2.1.0)
+
+' ═══════════════════════════════════════
+' FRONTEND LAYER
+' ═══════════════════════════════════════
+
+package "FRONTEND  (Browser — Multi-Page SPA)" as FE #22223b {
+
+    package "index.html + app.js" as MainPage #2d2d48 {
+        [Diagnostic Registry\n(paginated, filterable table)] as DTable
+        [Dashboard Charts\n(KPI cards + Chart.js)] as Dashboard
+        [AI Chat Panel\n(session memory)] as ChatUI
+        [Folder Explorer\n(Server + Local upload)] as FolderUI
+        [Per-File RCA\nSelector] as PerFileUI
+        [User Auth\n(Sign In / Sign Up)] as AuthUI
+    }
+
+    package "knowledge_base.html + .js" as KBPage #2d2d48 {
+        [Upload Documents\n(PDF/DOCX/IMG/TXT/JSON)] as KBUpload
+        [Live Ingestion\nProgress Log] as KBProgress
+        [Chunk Viewer\n+ Delete] as KBChunks
+    }
+
+    package "knowledge_graph.html + .js + .css" as KGPage #2d2d48 {
+        [D3.js Force-Directed\nGraph Renderer] as KGGraph
+        [DTC / Module / VIN\nEntity Explorer] as KGExplorer
+        [Info Panels\n(Root Causes, Jira,\nRequirements, Timeline)] as KGPanels
+    }
+
+    package "reports.html + .js" as ReportsPage #2d2d48 {
+        [Saved Report Cards\n(RCA + LOG)] as ReportCards
+        [Markdown + Chart\nViewer Modal] as ReportView
+        [PDF Download\n(html2pdf.js)] as PDFExport
+    }
+
+    [style.css\n(shared design system:\ndark mode, glassmorphism)] as CSS
+    [chart.js\n(bundled, 100% offline)] as ChartLib
+}
+
+' ═══════════════════════════════════════
+' BACKEND LAYER
+' ═══════════════════════════════════════
+
+package "BACKEND  (FastAPI / Python)" as BE #22223b {
+
+    ' --- Ingestion Layer ---
+    package "Ingestion" as Ingest #2a2a45 {
+        [parser.py\n(CSV + KV-text\nauto-detect)] as Parser
+        [document_parser.py\n(PDF/DOCX/IMG/JSON\nPyMuPDF + Vision OCR\nSysML converter)] as DocParser
+    }
+
+    ' --- AI Engines ---
+    package "AI Engines" as AIEngines #2a2a45 {
+        [rca_engine.py\n(fleet-wide + per-file RCA\nsection-by-section reports\nReAct loop, 4 iterations\nco-occurrence, odometer,\nvoltage, repeat VINs)] as RCA
+        [log_analysis_engine.py\n(per-row AI analysis\n3-tier RAG fallback)] as LogAnalysis
+        [chatbot_engine.py\n(conversation memory\nRAG + chart generation\nsliding window: 20 msgs)] as Chatbot
+        [knowledge_graph_engine.py\n(DTC graph data builder\ndiagnostics + RAG merge\nentity explorer)] as KGEngine
+    }
+
+    ' --- Data & RAG Layer ---
+    package "Data & RAG" as DataLayer #2a2a45 {
+        [database.py\n(SQLite: 6-table schema\nCRUD, auth, sessions\nreports, chat_sessions)] as DB
+        [rag_engine.py\n(LLM semantic chunking\nrequirements logical chunk\narchitecture unified chunk)] as RAGEngine
+        [qdrant_service.py\n(Vector DB CRUD\nCloud + SQLite fallback)] as QdrantSvc
+    }
+
+    ' --- NVIDIA Client ---
+    [nvidia_client.py\n(LLM + Embed + Vision\n503 retry, abort_event\n.env persistence)] as NvidiaClient
+}
+
+' ═══════════════════════════════════════
+' EXTERNAL SERVICES & DATA STORES
+' ═══════════════════════════════════════
+
+database "SQLite DB\n(diagnostics.db)\n──────────\ndiagnostics\nusers\nsessions\nsaved_reports\nchat_sessions\nrag_knowledge_base" as SQLiteDB #1e3a5f
+
+cloud "Qdrant Cloud\nVector DB\n──────────\nCollection:\ndiagTrace_knowledge_base\nCosine, 128-dim" as QdrantCloud #3d1f2f
+
+cloud "NVIDIA NIM API\n──────────\nLLM: openai/gpt-oss-20b\nEmbed: nv-embedqa-e5-v5\nVision: llama-3.2-vision" as NvidiaAPI #3d1f2f
+
+' ═══════════════════════════════════════
+' CONNECTIONS — Frontend ↔ Backend
+' ═══════════════════════════════════════
+
+FE -[#7c83ff,thickness=3]-> BE : HTTP REST API\n(50+ endpoints)
+
+' ═══════════════════════════════════════
+' CONNECTIONS — Backend Internal
+' ═══════════════════════════════════════
+
+Parser --> DB : save_to_db()
+DocParser --> RAGEngine : raw text
+DocParser --> NvidiaClient : Vision OCR /\nSysML convert
+
+RCA --> DB : load_from_db()
+RCA --> QdrantSvc : RAG retrieval
+RCA --> NvidiaClient : LLM calls\n(section-by-section)
+RCA --> DB : auto-save reports
+
+LogAnalysis --> QdrantSvc : 3-tier retrieval
+LogAnalysis --> NvidiaClient : analysis prompt
+
+Chatbot --> QdrantSvc : RAG context
+Chatbot --> NvidiaClient : chat completion
+Chatbot --> DB : session persistence
+
+KGEngine --> DB : diagnostics data
+KGEngine --> QdrantSvc : RAG doc matching
+
+RAGEngine --> NvidiaClient : LLM chunking +\nembedding
+RAGEngine --> QdrantSvc : store chunks
+
+DB --> SQLiteDB : read / write\n(WAL mode,\nthreading.Lock)
+QdrantSvc --> QdrantCloud : upsert / search\n(preferred)
+QdrantSvc --> SQLiteDB : fallback\n(cosine via numpy)
+NvidiaClient --> NvidiaAPI : HTTPS calls\n(retry + abort)
+
+' ═══════════════════════════════════════
+' NOTES
+' ═══════════════════════════════════════
+
+note right of NvidiaAPI
+  All AI calls route through
+  nvidia_client.py with:
+  • 503 automatic retry
+  • abort_event support
+  • 600s LLM timeout
+  • 30s embed timeout
+end note
+
+note bottom of SQLiteDB
+  WAL mode enabled
+  30-second timeout
+  threading.Lock for all writes
+  Auto schema migration
+end note
+
+note right of QdrantCloud
+  If Qdrant is not configured,
+  all vectors fall back to the
+  rag_knowledge_base table in
+  SQLite with numpy cosine sim
+end note
+
+@enduml
 ```
 
 ### Architecture Highlights
