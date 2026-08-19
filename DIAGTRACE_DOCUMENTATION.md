@@ -60,54 +60,88 @@ In automotive engineering, vehicles generate hundreds of **Diagnostic Trouble Co
 ## 2. System Architecture
 
 ```
-+------------------------------------------------------------------+
-|                      DiagTrace System                           |
-|                                                                 |
-|  +----------------------------------------------------------+   |
-|  |               FRONTEND (Browser)                        |   |
-|  |  index.html + app.js + style.css + chart.js             |   |
-|  |  - Diagnostic Registry Table                            |   |
-|  |  - Dashboard Charts (KPI, Top DTCs, Modules)            |   |
-|  |  - Folder Explorer (Server & Local)                     |   |
-|  |  - RAG Knowledge Base Manager                           |   |
-|  |  - AI Chat Panel                                        |   |
-|  |  - User Auth (Sign Up / Sign In)                        |   |
-|  +----------------------------+-----------------------------+   |
-|                               | HTTP REST API               |   |
-|  +----------------------------v-----------------------------+   |
-|  |              BACKEND (FastAPI / Python)                 |   |
-|  |                                                         |   |
-|  |  +----------+  +----------+  +-----------+             |   |
-|  |  |  parser  |  | database |  | rag_engine|             |   |
-|  |  |  .py     |  |  .py     |  |   .py     |             |   |
-|  |  +----------+  +----+-----+  +-----------+             |   |
-|  |                     |                                   |   |
-|  |  +----------+  +----v-----+  +-----------+             |   |
-|  |  |rca_engine|  | SQLite   |  | qdrant_   |             |   |
-|  |  |  .py     |  |  DB      |  | service.py|             |   |
-|  |  +----------+  +----------+  +-----+-----+             |   |
-|  |                                    |                    |   |
-|  |  +----------+  +----------+  +-----v-----+             |   |
-|  |  |log_analy-|  |chatbot_  |  |  Qdrant   |             |   |
-|  |  |sis_engine|  |engine.py |  | Vector DB |             |   |
-|  |  +----------+  +----------+  +-----------+             |   |
-|  |                     |                                   |   |
-|  |  +------------------v---------------------------------+ |   |
-|  |  |        NVIDIA NIM AI APIs                         | |   |
-|  |  |  LLM: openai/gpt-oss-20b                          | |   |
-|  |  |  Embeddings: nvidia/nv-embedqa-e5-v5              | |   |
-|  |  +---------------------------------------------------+ |   |
-|  +---------------------------------------------------------+   |
-+------------------------------------------------------------------+
++------------------------------------------------------------------------+
+|                        DiagTrace System                                |
+|                                                                        |
+|  +------------------------------------------------------------------+  |
+|  |                  FRONTEND (Browser — Multi-Page SPA)             |  |
+|  |                                                                  |  |
+|  |  index.html + app.js + style.css + chart.js (bundled, offline)  |  |
+|  |  ┌─────────────────────────────────────────────────────────┐    |  |
+|  |  │ Diagnostic Registry Table  │  Dashboard Charts (KPIs)   │    |  |
+|  |  │ Folder Explorer (Svr/Local)│  AI Chat Panel (+ Memory)  │    |  |
+|  |  │ Per-File RCA selector      │  User Auth (Sign-In/Up)    │    |  |
+|  |  └─────────────────────────────────────────────────────────┘    |  |
+|  |                                                                  |  |
+|  |  knowledge_base.html + knowledge_base.js                        |  |
+|  |  ┌──────────────────────────────────────────────────────────┐   |  |
+|  |  │ Upload Docs (PDF/DOCX/IMG/TXT/JSON) │ Chunk Viewer       │   |  |
+|  |  │ Live Ingestion Progress Log          │ Delete Chunks      │   |  |
+|  |  └──────────────────────────────────────────────────────────┘   |  |
+|  |                                                                  |  |
+|  |  knowledge_graph.html + knowledge_graph.js + knowledge_graph.css|  |
+|  |  ┌──────────────────────────────────────────────────────────┐   |  |
+|  |  │ D3.js Force-Directed Graph │ DTC/Module/VIN Explorer     │   |  |
+|  |  │ Root Causes Panel          │ Jira/SIMS Tickets Panel     │   |  |
+|  |  │ Requirements Panel         │ Activity Timeline           │   |  |
+|  |  │ Expand Graph (Fullscreen)  │ On-Demand AI Analysis       │   |  |
+|  |  └──────────────────────────────────────────────────────────┘   |  |
+|  |                                                                  |  |
+|  |  reports.html + reports.js                                      |  |
+|  |  ┌──────────────────────────────────────────────────────────┐   |  |
+|  |  │ Saved RCA + LOG Report Cards │ Markdown + Chart Viewer   │   |  |
+|  |  │ Search / Filter              │ PDF Download (html2pdf.js) │   |  |
+|  |  └──────────────────────────────────────────────────────────┘   |  |
+|  +------------------------------------------------------------------+  |
+|                              │ HTTP REST API                           |
+|  +---------------------------▼----------------------------------------+  |
+|  |                 BACKEND (FastAPI / Python)                        |  |
+|  |                                                                  |  |
+|  |  ┌─────────────┐  ┌─────────────┐  ┌──────────────────────┐    |  |
+|  |  │  parser.py  │  │ database.py │  │    rag_engine.py      │    |  |
+|  |  │ (CSV + KV)  │  │  (SQLite)   │  │ (chunk + embed)       │    |  |
+|  |  └─────────────┘  └──────┬──────┘  └──────────┬───────────┘    |  |
+|  |                           │                    │                 |  |
+|  |  ┌─────────────┐  ┌──────▼──────┐  ┌──────────▼───────────┐    |  |
+|  |  │ rca_engine  │  │  SQLite DB  │  │   qdrant_service.py   │    |  |
+|  |  │(fleet+file) │  │  (WAL mode) │  │  (Cloud / SQLite FB)  │    |  |
+|  |  │ per-file    │  │  6 tables   │  └──────────┬───────────┘    |  |
+|  |  │ quick-stats │  └─────────────┘             │                 |  |
+|  |  └─────────────┘                       ┌──────▼──────┐         |  |
+|  |                                         │ Qdrant Cloud│         |  |
+|  |  ┌──────────────────┐  ┌─────────────┐ │ Vector DB   │         |  |
+|  |  │log_analysis_     │  │chatbot_     │ └─────────────┘         |  |
+|  |  │engine.py         │  │engine.py    │                          |  |
+|  |  │(3-tier RAG)      │  │(session mem)│                          |  |
+|  |  └──────────────────┘  └─────────────┘                         |  |
+|  |                                                                  |  |
+|  |  ┌──────────────────────┐  ┌──────────────────────────────────┐ |  |
+|  |  │knowledge_graph_      │  │        NVIDIA NIM AI APIs         │ |  |
+|  |  │engine.py             │  │  LLM    : openai/gpt-oss-20b      │ |  |
+|  |  │(graph data builder)  │  │  Embed  : nv-embedqa-e5-v5 (128d) │ |  |
+|  |  └──────────────────────┘  │  Vision : llama-3.2-vision        │ |  |
+|  |                             │           (OCR + SysML convert)   │ |  |
+|  |  ┌──────────────────────┐  └──────────────────────────────────┘ |  |
+|  |  │document_parser.py    │                                        |  |
+|  |  │(PDF/DOCX/IMG/JSON)   │  ┌──────────────────────────────────┐ |  |
+|  |  │ PyMuPDF + Vision OCR │  │      nvidia_client.py            │ |  |
+|  |  │ SysML converter      │  │  LLM / Embed / Vision API client │ |  |
+|  |  └──────────────────────┘  │  503 retry + abort_event support │ |  |
+|  |                             └──────────────────────────────────┘ |  |
+|  +------------------------------------------------------------------+  |
++------------------------------------------------------------------------+
 ```
 
 ### Architecture Highlights
 
-- **Single-page application** served directly by FastAPI (no separate web server needed)
-- **Offline-compatible** frontend with locally bundled Chart.js (no CDN dependency)
-- **Dual vector storage** strategy: Qdrant Cloud (preferred) with automatic SQLite fallback
-- **Agentic AI** — the RCA engine can run multiple search/retrieval iterations before producing a final report
-- **Abort support** — long-running AI operations can be cancelled by the client mid-stream
+- **Multi-page frontend** — `index.html` (Diagnostic Registry + Dashboard), `knowledge_base.html` (RAG manager), `knowledge_graph.html` (D3.js DTC Relationship Explorer), `reports.html` (Saved Reports repository) — all sharing one design system via `style.css`
+- **Offline-compatible** frontend with locally bundled Chart.js; D3.js, Marked.js, and html2pdf.js loaded via CDN (Knowledge Graph and Reports pages)
+- **Dual vector storage** — Qdrant Cloud (preferred) with automatic SQLite `rag_knowledge_base` fallback including numpy cosine similarity
+- **Agentic RCA** — fleet-wide and per-file; uses a ReAct-style loop (up to 4 search iterations) then generates each report section via individual LLM calls to avoid token limits
+- **Conversation memory** — chatbot sessions persisted to `chat_sessions` SQLite table; sliding window of 20 messages (10 turns)
+- **Vision AI** — NVIDIA Llama 3.2 Vision for scanned PDF OCR and ECU Architecture diagram → SysML v2 conversion
+- **Abort support** — all long-running AI endpoints (`/api/ai/rca`, `/api/ai/rca/file/{name}`, `/api/analyze-log`) detect client disconnection via `asyncio` + `threading.Event` and cancel cleanly
+- **Auto-save** — every RCA and per-row log analysis result is automatically saved to `saved_reports` and surfaces on the Reports page
 
 ---
 
@@ -164,42 +198,58 @@ python-multipart
 
 ```
 DiagTrace/
-+-- .env                        # API keys & configuration (NEVER commit to git)
-+-- .env.example                # Template for .env setup
-+-- .gitignore                  # Git ignore rules
-+-- .dockerignore               # Docker build exclusions
-+-- Dockerfile                  # Docker container definition
-+-- requirements.txt            # Python dependencies
-+-- run.py                      # Application entry point (launches uvicorn)
-+-- test_ai_rag.py              # Test script: AI + RAG integration
-+-- test_rag_file_upload.py     # Test script: File upload to RAG
-|
-+-- backend/                    # Python FastAPI backend
-|   +-- __init__.py
-|   +-- main.py                 # Main FastAPI app + all REST API endpoints
-|   +-- parser.py               # Diagnostic log file parser (CSV + TXT/KV)
-|   +-- database.py             # SQLite schema, CRUD, user auth, sessions
-|   +-- rca_engine.py           # Agentic AI Root Cause Analysis engine
-|   +-- log_analysis_engine.py  # Per-row AI diagnostic log analysis
-|   +-- chatbot_engine.py       # AI chatbot with RAG + chart generation
-|   +-- rag_engine.py           # RAG ingestion: chunking + embeddings
-|   +-- qdrant_service.py       # Vector DB: Qdrant Cloud / SQLite fallback
-|   +-- nvidia_client.py        # NVIDIA NIM LLM + embedding API client
-|   +-- document_parser.py      # PDF/DOCX/JSON/TXT text extractor
-|   +-- diagnostics.db          # SQLite database (auto-created)
-|
-+-- frontend/                   # Static web frontend
-|   +-- index.html              # Main SPA HTML (825 lines)
-|   +-- app.js                  # Frontend logic (~126KB)
-|   +-- style.css               # Full design system (~50KB)
-|   +-- chart.js                # Bundled Chart.js library (offline)
-|
-+-- ingest_test/                # Sample test data for development
-    +-- LIST.txt
-    +-- log_file_1.txt ... log_file_10.txt   # Sample TXT diagnostic logs
-    +-- DTC_RAW _LOGS/
-    |   +-- dtc_raw_logs_sample.csv          # Sample CSV DTC data
-    +-- context_Files/          # Sample knowledge base documents
+├── .env                           # API keys & configuration (NEVER commit)
+├── .env.example                   # Template for .env setup
+├── .gitignore / .dockerignore     # Git + Docker ignore rules
+├── Dockerfile                     # Docker container definition
+├── requirements.txt               # Python dependencies
+├── run.py                         # Entry point — launches uvicorn
+├── test_ai_rag.py                 # Test: AI + RAG integration
+├── test_rag_file_upload.py        # Test: file upload to RAG pipeline
+│
+├── backend/                       # Python FastAPI backend
+│   ├── __init__.py
+│   ├── main.py                    # FastAPI app + ALL 50+ REST endpoints (838 lines)
+│   ├── parser.py                  # Diagnostic log parser (CSV + KV-text auto-detect)
+│   ├── database.py                # SQLite: 6-table schema, CRUD, auth, sessions,
+│   │                              #   saved_reports, chat_sessions (475 lines)
+│   ├── rca_engine.py              # Agentic RCA: fleet-wide + per-file,
+│   │                              #   feature extraction, chart data, section-by-section
+│   │                              #   LLM report generation, co-occurrence, odometer,
+│   │                              #   voltage correlation, repeat-offender VINs (1106 lines)
+│   ├── log_analysis_engine.py     # Per-row AI analysis: 3-tier RAG fallback
+│   ├── chatbot_engine.py          # Chatbot: conversation memory, RAG, chart specs
+│   ├── rag_engine.py              # RAG ingestion: LLM semantic chunking, requirements
+│   │                              #   logical chunking, architecture unified chunk
+│   ├── qdrant_service.py          # Vector DB: Qdrant Cloud + SQLite fallback, CRUD
+│   ├── nvidia_client.py           # NVIDIA NIM: LLM + Embed + Vision API client,
+│   │                              #   503 retry, abort_event, .env persistence
+│   ├── document_parser.py         # Document parser: PDF (PyMuPDF + table extraction
+│   │                              #   + Vision OCR), DOCX, TXT, JSON, IMG → SysML
+│   ├── knowledge_graph_engine.py  # Knowledge graph data builder: DTC overview,
+│   │                              #   RAG data extraction, related DTCs, activity
+│   │                              #   timeline, dynamic entity-type graphs
+│   └── diagnostics.db             # SQLite database (auto-created on first run)
+│
+├── frontend/                      # Static web frontend (served by FastAPI)
+│   ├── index.html                 # Main page — Diagnostic Registry + Dashboard + RCA
+│   ├── app.js                     # Main frontend logic + shared utilities (~126 KB)
+│   ├── style.css                  # Shared design system: dark mode, glassmorphism (~65 KB)
+│   ├── chart.js                   # Bundled Chart.js (100% offline — no CDN)
+│   ├── knowledge_base.html        # Knowledge Base management page
+│   ├── knowledge_base.js          # KB page: upload, chunk viewer, delete, progress
+│   ├── knowledge_graph.html       # DTC Knowledge Graph Explorer (D3.js, Marked.js)
+│   ├── knowledge_graph.js         # Graph page: D3 force layout, panels, fullscreen
+│   ├── knowledge_graph.css        # Graph-specific styles (node colors, panels)
+│   ├── reports.html               # Saved AI Reports page (html2pdf.js)
+│   └── reports.js                 # Reports page: list, view, search, delete, PDF
+│
+└── ingest_test/                   # Sample test data for development
+    ├── LIST.txt
+    ├── log_file_1.txt … log_file_10.txt  # Sample TXT diagnostic logs
+    ├── DTC_RAW_LOGS/
+    │   └── dtc_raw_logs_sample.csv       # Sample CSV DTC data
+    └── context_Files/                    # Sample knowledge base documents
 ```
 
 ---
@@ -806,61 +856,184 @@ AI settings can also be changed at runtime via the Settings panel in the UI — 
 
 ## 12. RAG Knowledge Base System
 
-The Knowledge Base is the "brain" that gives DiagTrace domain-specific automotive context.
+The Knowledge Base is the "brain" that gives DiagTrace domain-specific automotive context for AI analysis, chatbot answers, and RCA hypotheses.
 
 ### What to Store
 
 | Category | Example Content |
 |----------|----------------|
-| **ECU Architecture** | Module descriptions, CAN bus topology, ECM/TCM/ABS spec sheets |
-| **DTC Reference** | Detailed root cause guides for specific DTC codes |
-| **Requirements** | Software/hardware requirements documents (SRS, SDS) |
-| **Jira Issues** | Known bugs, open tickets, engineering action items |
+| **ECU Architecture** | Module descriptions, CAN bus topology, ECM/TCM/ABS spec sheets, architecture diagrams |
+| **DTC Reference** | Root cause guides, repair steps for specific DTC codes |
+| **Requirements** | SRS/SDS documents with `REQ-XXX` IDs — each requirement becomes its own retrievable chunk |
+| **Jira / SIMS Issues** | Known bugs, open tickets (`SIMS-XXXX`), engineering action items |
 | **Test Procedures** | Step-by-step diagnostic and repair procedures |
 | **Signal Matrix** | CAN signal definitions, message IDs, arbitration rules |
 
 ### Supported Upload Formats
 
-| Format | Handler |
-|--------|---------|
-| `.pdf` | PyMuPDF structural layout text, markdown table extraction & image OCR |
-| `.docx` | python-docx paragraph + table extraction |
-| `.txt`, `.log`, `.md`, `.csv` | UTF-8/Latin-1 plain text decoding |
-| `.json` | Parsed and pretty-printed as structured text |
-| `.png`, `.jpg`, `.jpeg`, `.webp` | NVIDIA Vision OCR & ECU Architecture SysML v2 diagram conversion |
+| Format | Parsing Method | Notes |
+|--------|---------------|-------|
+| `.pdf` | **PyMuPDF** — structural text blocks + table extraction (Markdown) | Falls back to `pypdf` if PyMuPDF unavailable |
+| `.pdf` (scanned) | **NVIDIA Llama 3.2 Vision OCR** — triggered when < 40 chars extracted per page | Auto-detected per page |
+| `.pdf` (architecture category) | **NVIDIA Vision SysML Converter** — every page rendered as pixmap → SysML v2/PlantUML code | Triggered by category name |
+| `.docx` | **python-docx** — paragraphs + table rows | Falls back to plain text decode |
+| `.txt`, `.log`, `.md`, `.csv` | UTF-8 / UTF-8-SIG / Latin-1 / CP1252 decode (waterfall) | Encoding auto-detected |
+| `.json` | `json.loads()` → `json.dumps(indent=2)` pretty-print | Structured text for RAG |
+| `.png`, `.jpg`, `.jpeg`, `.webp` | **NVIDIA Llama 3.2 Vision** — OCR (general) or SysML converter (architecture category) | Base64-encoded image sent to API |
 
+### Chunking Strategy Selection
+
+After text extraction, `rag_engine.py` picks the chunking strategy based on file type and category:
+
+| Condition | Strategy | Why |
+|-----------|----------|-----|
+| Image file **or** category contains `"architecture"` | **Single Unified Chunk** | Preserves complete SysML diagram/architectural context — splitting would lose structural relationships |
+| Category contains `"requirements"` | **Logical Requirements Chunking** | Each `REQ-XXX` line → its own chunk; DTC references extracted for precise per-requirement retrieval |
+| All other documents | **LLM Semantic Boundary Chunking** | Best semantic coherence; falls back to heuristic heading-based chunking if LLM call fails |
 
 ### Ingestion Pipeline
 
 ```
-Upload File (bytes)
-      |
-      v
-Document Parser (extract raw text)
-      |
-      v
-LLM Semantic Chunking
-  (3,500 char slices -> LLM -> [{title, content}, ...])
-      |
-      v
-NVIDIA Embedding API
-  (each chunk -> 128-dim float vector)
-      |
-      v
-Qdrant Cloud Storage
-  OR
-SQLite fallback (rag_knowledge_base table)
+Upload File (bytes)  →  POST /api/rag/upload-file
+      │
+      ▼
+Background Job assigned (job_id = "job_a3b2c1d4")
+      │
+      ▼
+┌─────────────────────────────────────────────────────────────────┐
+│ Step 1 — Document Parser  (document_parser.py)                  │
+│  • PDF  : PyMuPDF blocks + table Markdown  → Vision OCR/SysML   │
+│  • DOCX : python-docx paragraphs + tables                       │
+│  • IMG  : Base64 → NVIDIA Vision (OCR or SysML)                 │
+│  • TXT/JSON : encoding-waterfall decode                         │
+└───────────────────────────┬─────────────────────────────────────┘
+                            │ raw_text (str)
+                            ▼
+┌─────────────────────────────────────────────────────────────────┐
+│ Step 2 — Chunking Strategy  (rag_engine.py)                     │
+│                                                                 │
+│  Architecture/Image  ──►  Single unified chunk                  │
+│  Requirements        ──►  One chunk per REQ-XXX line            │
+│  Everything else     ──►  LLM Semantic Chunking                 │
+│    • Split text into 3,500-char slices (by paragraph)           │
+│    • LLM returns [{"title": ..., "content": ...}, ...]          │
+│    • Fallback: heuristic section-heading split                  │
+└───────────────────────────┬─────────────────────────────────────┘
+                            │ chunks[]
+                            ▼
+┌─────────────────────────────────────────────────────────────────┐
+│ Step 3 — NVIDIA Embedding API  (nvidia_client.py)               │
+│  • Each chunk content  →  128-dimensional float vector          │
+│  • Fallback: SHA-256 hash → pseudo-vector (SQLite fallback only)│
+└───────────────────────────┬─────────────────────────────────────┘
+                            │ (chunk, vector) pairs
+                            ▼
+┌─────────────────────────────────────────────────────────────────┐
+│ Step 4 — Vector Storage  (qdrant_service.py)                    │
+│                                                                 │
+│  Qdrant Cloud (preferred)          SQLite fallback              │
+│  Collection: diagtrace_knowledge_base  Table: rag_knowledge_base│
+│  Distance: Cosine, 128-dim         vector_json: JSON array      │
+└─────────────────────────────────────────────────────────────────┘
+
+Progress tracked live in RAG_JOBS[job_id] → poll GET /api/rag/jobs/{job_id}
 ```
 
-### Retrieval Strategy (for AI features)
+### Retrieval Strategy (used by all AI features)
 
-The `log_analysis_engine.py` uses a **3-tier retrieval fallback**:
+The `log_analysis_engine.py` uses a **3-tier retrieval fallback** to ensure the AI always has relevant context:
 
-1. **Primary**: Vector search with 60% cosine similarity threshold (`top_k=3`)
-2. **Fallback 1**: Vector search with 0% threshold (gets best available, `top_k=5`)
-3. **Fallback 2**: Keyword-based string matching across all stored documents
+| Tier | Method | Threshold | top_k |
+|------|--------|-----------|-------|
+| **Primary** | NVIDIA embedding → Qdrant/SQLite cosine vector search | ≥ 60% similarity | 3 |
+| **Fallback 1** | Same vector search, no similarity floor | 0% (best available) | 5 |
+| **Fallback 2** | Keyword substring match across all stored document content | N/A | All matching |
 
-This ensures that even without perfectly matched embeddings, the AI always has some relevant context.
+### Knowledge Base Management API
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `POST` | `/api/rag/ingest` | Ingest plain text document directly |
+| `POST` | `/api/rag/upload-file` | Upload binary file (multipart); returns `job_id` |
+| `GET` | `/api/rag/jobs/{job_id}` | Poll ingestion progress (`status`, `progress_percent`, `logs[]`) |
+| `GET` | `/api/rag/documents` | List all stored document titles and categories |
+| `GET` | `/api/rag/chunks` | Paginated chunk browser with `category` + `search` filters |
+| `DELETE` | `/api/rag/chunks/{chunk_id}` | Delete a single chunk by ID |
+
+---
+
+## 12a. Knowledge Graph Explorer
+
+The Knowledge Graph (`knowledge_graph.html` + `knowledge_graph.js`) is a separate interactive page that visualises DTC relationships by combining the diagnostics SQLite database with the RAG knowledge base.
+
+### How It Works
+
+1. **DTC Dropdown** — populated from `GET /api/knowledge-graph/dtc-list` (all unique DTC codes sorted by occurrence count)
+2. **Entity Explorer** — alternative search by entity type (`module`, `vin`, `program`) via `GET /api/knowledge-graph/explore?entity_type=&entity_id=`
+3. **Graph Rendering** — D3.js v7 force-directed simulation renders nodes and edges returned by the backend
+4. **Info Panels** — sidebar and bottom panels show structured details from both data sources
+
+### Backend Data Builder (`knowledge_graph_engine.py`)
+
+For each DTC code the engine merges **two data sources**:
+
+| Source | Fields Used |
+|--------|------------|
+| SQLite `diagnostics` table | Module, description, issue status, timestamps, related DTCs (same module + co-occurring on same VIN), programs, AI Analysis |
+| RAG knowledge base | Root causes, system reaction, severity, components, programs affected, Jira/SIMS tickets (parsed with regex), Requirements (REQ-XXX) |
+
+**RAG relevance matching** — a document is considered relevant to a DTC if the code appears in the document title or content, including module-prefixed variants (`ECM_P0300`, `ABS_C0045`, etc.).
+
+### Graph Node Types
+
+| Node `type` | Visual Style | Represents |
+|-------------|-------------|------------|
+| `dtc` | Severity-colored, pinned at centre (`fx=0, fy=0`) | The selected DTC code |
+| `module` | Module accent colour | Owning ECU module (full name from lookup table) |
+| `description` | Description accent | DTC fault description text |
+| `group_node` | Group accent, shows item count | Collapsed set of programs, DTCs, modules, or VINs |
+| `requirements` | Requirements accent | SRS/SDS requirements referencing this DTC |
+| `related_dtc` | Muted DTC accent | Co-occurring or same-module DTCs (max 5 shown) |
+| `vin` | VIN accent | Vehicle IDs (Entity Explorer mode only) |
+
+### Graph Edge Labels (Relationships)
+
+| Label | Meaning |
+|-------|---------|
+| `owned by` | DTC → Module |
+| `describes` | DTC → Description node |
+| `affects` | DTC → Affected Programs group |
+| `specified by` | DTC → Requirements node |
+| `Same Module` | DTC → Related DTC on the same ECU |
+| `Co-occurring (VIN: …)` | DTC → Related DTC seen on the same vehicle |
+| `has dtc` | Entity (module/VIN/program) → DTC group |
+| `involves` | Entity → Module group |
+| `found in` | Entity → VIN group |
+
+### Side / Bottom Panels
+
+| Panel | Content |
+|-------|---------|
+| **DTC Overview** | Code, module (full name), description, severity, status, frequency label, first seen, last seen, occurrence count |
+| **Root Causes** | Bullet list extracted from RAG documents matching this DTC |
+| **System Reaction** | Degradation or system response text from RAG |
+| **Jira / SIMS Tickets** | Parsed ticket ID, title, status, priority, assignee |
+| **Requirements** | REQ-XXX ID, title, 200-char summary |
+| **Activity Timeline** | Detection events + AI analysis events sorted newest-first (max 15) |
+
+### Expand Graph (Fullscreen Mode)
+
+Toggle **"Expand Graph"** to switch layout:
+- Graph canvas takes full available width/height
+- Bottom panels (root causes, Jira, requirements) relocate into the right sidebar
+- The original bottom-panel row is hidden via CSS class `kg-fullscreen-graph`
+- A second `.kg-expanded-panels` div inside the sidebar becomes visible
+
+### On-Demand AI Analysis
+
+From the graph page the user can:
+- **View existing reports** for a DTC: `GET /api/knowledge-graph/analysis/{dtc_code}` — returns AI Analysis column values from the DB plus any `saved_reports` rows whose title contains the DTC code
+- **Run a new analysis**: `POST /api/knowledge-graph/analyze/{dtc_code}` — picks the first matching DB row, runs `run_log_analysis()`, saves result to the `AI Analysis` column, returns the Markdown report
 
 ---
 
