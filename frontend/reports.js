@@ -4,6 +4,7 @@
 
 let allReports = [];
 let currentViewReportId = null;
+let currentReportData = null;
 let pendingDeleteId = null;
 
 // --- DOM References ---
@@ -136,17 +137,20 @@ function renderFilteredReports() {
 }
 
 // --- View Report ---
-function viewReport(id) {
+function viewReport(id, autoDownload = false) {
     if (!dom.viewModal) return;
     dom.viewModal.classList.remove('hidden');
     if (dom.viewBody) dom.viewBody.innerHTML = '<div style="text-align:center; padding: 40px;"><span class="css-spinner"></span><p style="color: var(--text-muted); margin-top: 12px;">Loading report...</p></div>';
+    if (dom.reportChartsContainer) dom.reportChartsContainer.innerHTML = '';
     currentViewReportId = id;
+    currentReportData = null;
 
     fetch(`/api/reports/${id}`)
         .then(res => res.json())
         .then(data => {
             if (data.status === 'success' && data.report) {
                 const report = data.report;
+                currentReportData = report;
                 if (dom.viewTitle) {
                     dom.viewTitle.innerHTML = `
                         <svg fill="none" height="18" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" style="color: var(--primary);" viewbox="0 0 24 24" width="18"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline></svg> ${escapeHtml(report.title || 'Report')}`;
@@ -161,11 +165,18 @@ function viewReport(id) {
                                 Object.entries(chartsObj).forEach(([chartId, config]) => {
                                     const canvasWrapper = document.createElement('div');
                                     canvasWrapper.className = 'chart-wrapper';
-                                    canvasWrapper.style.cssText = "background: var(--bg-surface); padding: 12px; border-radius: 8px; border: 1px solid var(--border-color); position: relative; height: 350px; width: 100%; margin-bottom: 20px; page-break-inside: avoid !important; break-inside: avoid !important; break-inside: avoid-page !important;";
+                                    canvasWrapper.style.cssText = "background: var(--bg-surface); padding: 16px; border-radius: 10px; border: 1px solid var(--border-color); position: relative; height: 350px; width: 100%; margin-bottom: 20px; page-break-inside: avoid !important; break-inside: avoid !important;";
                                     const canvas = document.createElement('canvas');
                                     canvasWrapper.appendChild(canvas);
                                     dom.reportChartsContainer.appendChild(canvasWrapper);
-                                    new Chart(canvas.getContext('2d'), config);
+                                    
+                                    const chartConfig = JSON.parse(JSON.stringify(config));
+                                    if (!chartConfig.options) chartConfig.options = {};
+                                    chartConfig.options.animation = false;
+                                    chartConfig.options.responsive = true;
+                                    chartConfig.options.maintainAspectRatio = false;
+                                    
+                                    new Chart(canvas.getContext('2d'), chartConfig);
                                 });
                             }
                         } catch (e) {
@@ -176,6 +187,12 @@ function viewReport(id) {
 
                 if (dom.viewBody) {
                     dom.viewBody.innerHTML = renderMarkdown(report.content_markdown || '');
+                }
+
+                if (autoDownload) {
+                    setTimeout(() => {
+                        downloadCurrentReportPdf();
+                    }, 400);
                 }
             } else {
                 if (dom.viewBody) dom.viewBody.innerHTML = '<p style="color: var(--danger, #ef4444); text-align: center; padding: 20px;">Failed to load report.</p>';
@@ -190,37 +207,51 @@ function viewReport(id) {
 function closeViewModal() {
     if (dom.viewModal) dom.viewModal.classList.add('hidden');
     currentViewReportId = null;
+    currentReportData = null;
 }
 
 // --- Download PDF ---
 function downloadReportPdf(id) {
-    fetch(`/api/reports/${id}`)
-        .then(res => res.json())
-        .then(data => {
-            if (data.status === 'success' && data.report) {
-                generatePdfFromMarkdown(data.report.title, data.report.content_markdown);
-            }
-        })
-        .catch(err => console.error('Failed to download report:', err));
+    if (currentViewReportId === id && dom.viewModal && !dom.viewModal.classList.contains('hidden') && currentReportData) {
+        downloadCurrentReportPdf();
+    } else {
+        viewReport(id, true);
+    }
 }
 
 function downloadCurrentReportPdf() {
-    if (!currentViewReportId) return;
-    const element = document.querySelector('#report-view-modal .rca-modal-body');
-    if (!element) return;
+    if (!currentViewReportId) {
+        showToast("No report selected to download.", "warning");
+        return;
+    }
 
-    const title = dom.viewTitle ? dom.viewTitle.textContent.trim() : 'Report';
-    const filename = `${title.replace(/[^a-z0-9]/gi, '_').toLowerCase()}.pdf`;
+    const modalBody = document.querySelector('#report-view-modal .rca-modal-body');
+    if (!modalBody) {
+        showToast("Unable to find report content.", "error");
+        return;
+    }
 
-    const originalMaxHeight = element.style.maxHeight;
-    const originalOverflow = element.style.overflowY;
-    const originalColor = element.style.color;
-    element.style.maxHeight = 'none';
-    element.style.overflowY = 'visible';
-    element.style.color = '#000000'; // Force black text for PDF
+    const bodyText = modalBody.innerText.trim();
+    if (!bodyText || bodyText === 'Loading report...' || bodyText === 'Failed to load report.' || bodyText === 'Error loading report.') {
+        showToast("No report content available to download.", "warning");
+        return;
+    }
 
-    // Temporarily disable grid for PDF generation to allow page breaks to work
-    const chartsContainer = element.querySelector('.rca-charts-container');
+    showToast("📄 Generating PDF report...", "info");
+
+    const title = (dom.viewTitle ? dom.viewTitle.textContent.trim() : '') || (currentReportData && currentReportData.title) || 'Report';
+    const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+    const filename = `DiagTrace_Report_${title.replace(/[^a-z0-9]/gi, '_').toLowerCase()}_${timestamp}.pdf`;
+
+    const originalMaxHeight = modalBody.style.maxHeight;
+    const originalOverflow = modalBody.style.overflowY;
+    const originalColor = modalBody.style.color;
+
+    modalBody.style.maxHeight = 'none';
+    modalBody.style.overflowY = 'visible';
+    modalBody.style.color = 'var(--text-main, #0f172a)';
+
+    const chartsContainer = modalBody.querySelector('.rca-charts-container') || dom.reportChartsContainer;
     let originalChartsDisplay = '';
     if (chartsContainer) {
         originalChartsDisplay = chartsContainer.style.display;
@@ -228,12 +259,12 @@ function downloadCurrentReportPdf() {
     }
 
     const opt = {
-        margin:       10,
+        margin:       [12, 12, 12, 12],
         filename:     filename,
         image:        { type: 'jpeg', quality: 0.98 },
-        html2canvas:  { scale: 2, useCORS: true, logging: false },
+        html2canvas:  { scale: 2, useCORS: true, logging: false, backgroundColor: '#ffffff', scrollY: 0, scrollX: 0 },
         jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' },
-        pagebreak:    { mode: ['avoid-all', 'css', 'legacy'], avoid: ['.chart-wrapper', '.chart-card', 'h1', 'h2', 'h3', 'table', 'tr', 'pre', 'img'] }
+        pagebreak:    { mode: ['avoid-all', 'css', 'legacy'], avoid: ['.chart-wrapper', 'table', 'tr', 'h1', 'h2', 'h3', 'code', 'ul'] }
     };
 
     const pdfStyles = document.createElement('style');
@@ -257,51 +288,43 @@ function downloadCurrentReportPdf() {
         #report-view-modal td, .markdown-body td {
             color: #1e293b !important;
         }
+        .chart-wrapper {
+            background: #ffffff !important;
+            border: 1px solid #e2e8f0 !important;
+        }
     `;
     document.head.appendChild(pdfStyles);
 
     const cleanupPdfStyles = () => {
         const el = document.getElementById('pdf-export-styles-reports');
         if (el) el.remove();
-        element.style.maxHeight = originalMaxHeight;
-        element.style.overflowY = originalOverflow;
-        element.style.color = originalColor;
+        modalBody.style.maxHeight = originalMaxHeight;
+        modalBody.style.overflowY = originalOverflow;
+        modalBody.style.color = originalColor;
         if (chartsContainer) chartsContainer.style.display = originalChartsDisplay;
     };
 
-    html2pdf().set(opt).from(element).save().then(() => {
+    if (typeof html2pdf !== 'undefined') {
+        html2pdf().set(opt).from(modalBody).save().then(() => {
+            cleanupPdfStyles();
+            showToast(`🎉 Downloaded PDF Report (${filename})`, 'success');
+        }).catch(err => {
+            console.error('PDF generation error:', err);
+            cleanupPdfStyles();
+            showToast("Failed to generate PDF report.", "error");
+        });
+    } else {
+        window.print();
         cleanupPdfStyles();
-    }).catch(err => {
-        console.error('PDF generation error:', err);
-        cleanupPdfStyles();
-    });
+    }
 }
 
 function generatePdfFromMarkdown(title, markdown) {
-    // Create a temporary hidden container, render markdown, generate PDF, then remove
-    const container = document.createElement('div');
-    container.className = 'markdown-body';
-    container.style.cssText = 'padding: 20px; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; max-width: 800px; color: #1a1a2e;';
-    container.innerHTML = renderMarkdown(markdown || '');
-    document.body.appendChild(container);
-
-    const filename = `${(title || 'report').replace(/[^a-z0-9]/gi, '_').toLowerCase()}.pdf`;
-
-    const opt = {
-        margin:       10,
-        filename:     filename,
-        image:        { type: 'jpeg', quality: 0.98 },
-        html2canvas:  { scale: 2, useCORS: true, logging: false },
-        jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' },
-        pagebreak:    { mode: ['avoid-all', 'css', 'legacy'], avoid: ['h1', 'h2', 'h3', 'table', 'tr', 'pre', 'img'] }
-    };
-
-    html2pdf().set(opt).from(container).save().then(() => {
-        document.body.removeChild(container);
-    }).catch(err => {
-        console.error('PDF generation error:', err);
-        document.body.removeChild(container);
-    });
+    if (!currentViewReportId) {
+        showToast("Please open a report to download its PDF.", "info");
+        return;
+    }
+    downloadCurrentReportPdf();
 }
 
 // --- Delete Report ---
