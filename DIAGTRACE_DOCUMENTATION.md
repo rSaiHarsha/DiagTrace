@@ -228,6 +228,9 @@ end note
 @enduml
 ```
 
+![System Architecture](architecture.png)
+
+
 ### Architecture Highlights
 
 - **Multi-page frontend** — `index.html` (Diagnostic Registry + Dashboard), `knowledge_base.html` (RAG manager), `knowledge_graph.html` (D3.js DTC Relationship Explorer), `reports.html` (Saved Reports repository) — all sharing one design system via `style.css`
