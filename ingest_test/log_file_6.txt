@@ -1,1 +1,348 @@
-mock content
+================================================================================
+DIAGNOSTIC LOG FILE: log_file_6.txt
+System: DiagTrace Vehicle Diagnostics Parser Engine
+Total Log Records: 38
+================================================================================
+
+[2026-05-03 19:29:45] VIN: 1FTXG5USXC5D8CWCX
+  Program Name : Delta EV
+  Module       : SRS (Airbag)
+  DTC Code     : P0300
+  Description  : Random/Multiple Cylinder Misfire Detected
+  Issue Status : Closed
+  Author       : Alice Dev
+  Comments     : Auto-generated log entry.
+--------------------------------------------------------------------------------
+[2026-01-09 19:29:45] VIN: 1FTRKRS8X7NEDF5WV
+  Program Name : Alpha Series
+  Module       : SRS (Airbag)
+  DTC Code     : P0300
+  Description  : Random/Multiple Cylinder Misfire Detected
+  Issue Status : In Progress
+  Author       : Bob Eng
+  Comments     : Auto-generated log entry.
+--------------------------------------------------------------------------------
+[2026-05-29 19:29:45] VIN: 1FT25ZV5X92HWZBA3
+  Program Name : Delta EV
+  Module       : ABS Module
+  DTC Code     : P0171
+  Description  : System Too Lean (Bank 1)
+  Issue Status : In Progress
+  Author       : Delta Architect
+  Comments     : Auto-generated log entry.
+--------------------------------------------------------------------------------
+[2026-02-06 19:29:45] VIN: 1FTNWLUBX69Y4J6W4
+  Program Name : Beta Sedan
+  Module       : SRS (Airbag)
+  DTC Code     : B0028
+  Description  : Right Side Airbag Deployment Control
+  Issue Status : Closed
+  Author       : Charlie QA
+  Comments     : Auto-generated log entry.
+--------------------------------------------------------------------------------
+[2026-06-09 19:29:45] VIN: 1FTL59K9XKK4YAWET
+  Program Name : Beta Sedan
+  Module       : SRS (Airbag)
+  DTC Code     : B0028
+  Description  : Right Side Airbag Deployment Control
+  Issue Status : New
+  Author       : Bob Eng
+  Comments     : Auto-generated log entry.
+--------------------------------------------------------------------------------
+[2026-04-03 19:29:45] VIN: 1FTLY4T2XK7KSATA3
+  Program Name : Beta Sedan
+  Module       : ECM (Engine)
+  DTC Code     : B0028
+  Description  : Right Side Airbag Deployment Control
+  Issue Status : Closed
+  Author       : Delta Architect
+  Comments     : Auto-generated log entry.
+--------------------------------------------------------------------------------
+[2026-04-08 19:29:45] VIN: 1FT7SER2XZ96SWNXP
+  Program Name : Omega Truck
+  Module       : ECM (Engine)
+  DTC Code     : P0300
+  Description  : Random/Multiple Cylinder Misfire Detected
+  Issue Status : In Progress
+  Author       : Delta Architect
+  Comments     : Auto-generated log entry.
+--------------------------------------------------------------------------------
+[2026-06-22 19:29:45] VIN: 1FTRHBTHXH97J9C0N
+  Program Name : Delta EV
+  Module       : ECM (Engine)
+  DTC Code     : P0300
+  Description  : Random/Multiple Cylinder Misfire Detected
+  Issue Status : Under Investigation
+  Author       : Charlie QA
+  Comments     : Auto-generated log entry.
+--------------------------------------------------------------------------------
+[2026-02-18 19:29:45] VIN: 1FT7ZNUBX44Y890PV
+  Program Name : Alpha Series
+  Module       : TCM (Transmission)
+  DTC Code     : U0100
+  Description  : Lost Communication With ECM/PCM
+  Issue Status : In Progress
+  Author       : Delta Architect
+  Comments     : Auto-generated log entry.
+--------------------------------------------------------------------------------
+[2026-02-22 19:29:45] VIN: 1FT8TAXLXM17EJBSR
+  Program Name : Gamma SUV
+  Module       : TCM (Transmission)
+  DTC Code     : P0101
+  Description  : Mass Air Flow Sensor Circuit Range/Performance
+  Issue Status : Closed
+  Author       : Alice Dev
+  Comments     : Auto-generated log entry.
+--------------------------------------------------------------------------------
+[2026-03-23 19:29:45] VIN: 1FTPBLNFXA6GZ3JS2
+  Program Name : Delta EV
+  Module       : TCM (Transmission)
+  DTC Code     : P0101
+  Description  : Mass Air Flow Sensor Circuit Range/Performance
+  Issue Status : Under Investigation
+  Author       : Alice Dev
+  Comments     : Auto-generated log entry.
+--------------------------------------------------------------------------------
+[2026-04-15 19:29:45] VIN: 1FTM1GWJX80JBYH9C
+  Program Name : Gamma SUV
+  Module       : ECM (Engine)
+  DTC Code     : P0700
+  Description  : Transmission Control System Malfunction
+  Issue Status : Under Investigation
+  Author       : Charlie QA
+  Comments     : Auto-generated log entry.
+--------------------------------------------------------------------------------
+[2026-02-01 19:29:45] VIN: 1FTY7P5NXBS6B3XSB
+  Program Name : Beta Sedan
+  Module       : TCM (Transmission)
+  DTC Code     : B0028
+  Description  : Right Side Airbag Deployment Control
+  Issue Status : Under Investigation
+  Author       : Bob Eng
+  Comments     : Auto-generated log entry.
+--------------------------------------------------------------------------------
+[2026-05-07 19:29:45] VIN: 1FTUEWF4XR1SA2VJW
+  Program Name : Omega Truck
+  Module       : ABS Module
+  DTC Code     : B0028
+  Description  : Right Side Airbag Deployment Control
+  Issue Status : In Progress
+  Author       : Alice Dev
+  Comments     : Auto-generated log entry.
+--------------------------------------------------------------------------------
+[2026-05-09 19:29:45] VIN: 1FT40NWEXFCZHKVKR
+  Program Name : Delta EV
+  Module       : TCM (Transmission)
+  DTC Code     : P0300
+  Description  : Random/Multiple Cylinder Misfire Detected
+  Issue Status : In Progress
+  Author       : Charlie QA
+  Comments     : Auto-generated log entry.
+--------------------------------------------------------------------------------
+[2026-01-08 22:56:57] VIN: 1FT1Y7RTX5HM7V14Y
+  Program Name : Omega Truck
+  Module       : ECM (Engine)
+  DTC Code     : P0101
+  Description  : Mass Air Flow Sensor Circuit Range/Performance
+  Issue Status : Under Investigation
+  Author       : Alice Dev
+  Comments     : Auto-generated log entry.
+--------------------------------------------------------------------------------
+[2026-01-18 22:56:57] VIN: 1FTXVJL8XLTE5AJPJ
+  Program Name : Delta EV
+  Module       : ECM (Engine)
+  DTC Code     : P0700
+  Description  : Transmission Control System Malfunction
+  Issue Status : Open
+  Author       : Bob Eng
+  Comments     : Auto-generated log entry.
+--------------------------------------------------------------------------------
+[2026-05-01 22:56:57] VIN: 1FT7LKDCXD9908H3R
+  Program Name : Alpha Series
+  Module       : SRS (Airbag)
+  DTC Code     : B0028
+  Description  : Right Side Airbag Deployment Control
+  Issue Status : Closed
+  Author       : Delta Architect
+  Comments     : Auto-generated log entry.
+--------------------------------------------------------------------------------
+[2026-01-21 22:56:57] VIN: 1FT6TC16XAL62GUX2
+  Program Name : Delta EV
+  Module       : ECM (Engine)
+  DTC Code     : B0028
+  Description  : Right Side Airbag Deployment Control
+  Issue Status : Open
+  Author       : Bob Eng
+  Comments     : Auto-generated log entry.
+--------------------------------------------------------------------------------
+[2026-02-22 22:56:57] VIN: 1FTWV328XHV6G2L5W
+  Program Name : Gamma SUV
+  Module       : SRS (Airbag)
+  DTC Code     : U0100
+  Description  : Lost Communication With ECM/PCM
+  Issue Status : Closed
+  Author       : Delta Architect
+  Comments     : Auto-generated log entry.
+--------------------------------------------------------------------------------
+[2026-05-23 22:56:57] VIN: 1FTX0VRAX4TR5T17P
+  Program Name : Omega Truck
+  Module       : ABS Module
+  DTC Code     : U0100
+  Description  : Lost Communication With ECM/PCM
+  Issue Status : Under Investigation
+  Author       : Charlie QA
+  Comments     : Auto-generated log entry.
+--------------------------------------------------------------------------------
+[2026-03-30 22:56:57] VIN: 1FT5BV5HXPU7XWLW6
+  Program Name : Beta Sedan
+  Module       : TCM (Transmission)
+  DTC Code     : P0171
+  Description  : System Too Lean (Bank 1)
+  Issue Status : Closed
+  Author       : Charlie QA
+  Comments     : Auto-generated log entry.
+--------------------------------------------------------------------------------
+[2026-04-14 22:56:57] VIN: 1FTLZHY6XFF38HV3B
+  Program Name : Alpha Series
+  Module       : ECM (Engine)
+  DTC Code     : C0045
+  Description  : Brake Pressure Sensor 'B' Malfunction
+  Issue Status : New
+  Author       : Charlie QA
+  Comments     : Auto-generated log entry.
+--------------------------------------------------------------------------------
+[2026-06-10 22:56:57] VIN: 1FTCS56LXLA6Z7C3N
+  Program Name : Delta EV
+  Module       : SRS (Airbag)
+  DTC Code     : P0171
+  Description  : System Too Lean (Bank 1)
+  Issue Status : In Progress
+  Author       : Alice Dev
+  Comments     : Auto-generated log entry.
+--------------------------------------------------------------------------------
+[2026-03-10 22:56:57] VIN: 1FTKYVB8X60AZNPX9
+  Program Name : Alpha Series
+  Module       : ECM (Engine)
+  DTC Code     : B0028
+  Description  : Right Side Airbag Deployment Control
+  Issue Status : Open
+  Author       : Delta Architect
+  Comments     : Auto-generated log entry.
+--------------------------------------------------------------------------------
+[2026-01-10 22:56:57] VIN: 1FTGR3M9XZ45E4S2G
+  Program Name : Gamma SUV
+  Module       : ECM (Engine)
+  DTC Code     : C0045
+  Description  : Brake Pressure Sensor 'B' Malfunction
+  Issue Status : Closed
+  Author       : Alice Dev
+  Comments     : Auto-generated log entry.
+--------------------------------------------------------------------------------
+[2026-01-29 22:56:57] VIN: 1FTW0L93XP9PYRRDZ
+  Program Name : Omega Truck
+  Module       : ABS Module
+  DTC Code     : P0700
+  Description  : Transmission Control System Malfunction
+  Issue Status : Under Investigation
+  Author       : Delta Architect
+  Comments     : Auto-generated log entry.
+--------------------------------------------------------------------------------
+[2026-04-30 22:56:57] VIN: 1FTJU82UXNSS2UF0K
+  Program Name : Beta Sedan
+  Module       : ECM (Engine)
+  DTC Code     : B0028
+  Description  : Right Side Airbag Deployment Control
+  Issue Status : In Progress
+  Author       : Alice Dev
+  Comments     : Auto-generated log entry.
+--------------------------------------------------------------------------------
+[2026-02-24 22:52:24] VIN: 1FTHYXWBX67WGUCG9
+  Program Name : Alpha Series
+  Module       : TCM (Transmission)
+  DTC Code     : C0045
+  Description  : Brake Pressure Sensor 'B' Malfunction
+  Issue Status : New
+  Author       : Charlie QA
+  Comments     : Auto-generated log entry.
+--------------------------------------------------------------------------------
+[2026-03-03 22:52:24] VIN: 1FTSFMPUXYWHEW0U0
+  Program Name : Alpha Series
+  Module       : ABS Module
+  DTC Code     : P0420
+  Description  : Catalyst System Efficiency Below Threshold
+  Issue Status : Closed
+  Author       : Charlie QA
+  Comments     : Auto-generated log entry.
+--------------------------------------------------------------------------------
+[2026-04-14 22:52:24] VIN: 1FT2YM2ZX3LT182AV
+  Program Name : Gamma SUV
+  Module       : ECM (Engine)
+  DTC Code     : P0420
+  Description  : Catalyst System Efficiency Below Threshold
+  Issue Status : Open
+  Author       : Bob Eng
+  Comments     : Auto-generated log entry.
+--------------------------------------------------------------------------------
+[2026-02-23 22:52:24] VIN: 1FTSX6T7XH73BZR6W
+  Program Name : Delta EV
+  Module       : ECM (Engine)
+  DTC Code     : P0700
+  Description  : Transmission Control System Malfunction
+  Issue Status : Closed
+  Author       : Alice Dev
+  Comments     : Auto-generated log entry.
+--------------------------------------------------------------------------------
+[2026-07-07 22:52:24] VIN: 1FTB6GZPXFHAET709
+  Program Name : Alpha Series
+  Module       : ECM (Engine)
+  DTC Code     : U0100
+  Description  : Lost Communication With ECM/PCM
+  Issue Status : Under Investigation
+  Author       : Delta Architect
+  Comments     : Auto-generated log entry.
+--------------------------------------------------------------------------------
+[2026-07-11 22:52:24] VIN: 1FTEH1S5X9MZ75BDB
+  Program Name : Gamma SUV
+  Module       : ABS Module
+  DTC Code     : P0420
+  Description  : Catalyst System Efficiency Below Threshold
+  Issue Status : New
+  Author       : Delta Architect
+  Comments     : Auto-generated log entry.
+--------------------------------------------------------------------------------
+[2026-05-01 22:52:24] VIN: 1FTJX5GEX1GRH6A8H
+  Program Name : Alpha Series
+  Module       : ECM (Engine)
+  DTC Code     : P0700
+  Description  : Transmission Control System Malfunction
+  Issue Status : Under Investigation
+  Author       : Alice Dev
+  Comments     : Auto-generated log entry.
+--------------------------------------------------------------------------------
+[2026-07-15 22:52:24] VIN: 1FTV6EZBXA4FJKJWP
+  Program Name : Delta EV
+  Module       : TCM (Transmission)
+  DTC Code     : U0100
+  Description  : Lost Communication With ECM/PCM
+  Issue Status : New
+  Author       : Delta Architect
+  Comments     : Auto-generated log entry.
+--------------------------------------------------------------------------------
+[2026-05-12 22:52:24] VIN: 1FTY244KXTTTGTMWG
+  Program Name : Delta EV
+  Module       : BCM (Body)
+  DTC Code     : B0028
+  Description  : Right Side Airbag Deployment Control
+  Issue Status : New
+  Author       : Alice Dev
+  Comments     : Auto-generated log entry.
+--------------------------------------------------------------------------------
+[2026-07-09 22:52:24] VIN: 1FTZKRUAXV15VRDXV
+  Program Name : Omega Truck
+  Module       : ECM (Engine)
+  DTC Code     : B0028
+  Description  : Right Side Airbag Deployment Control
+  Issue Status : In Progress
+  Author       : Delta Architect
+  Comments     : Auto-generated log entry.
+--------------------------------------------------------------------------------

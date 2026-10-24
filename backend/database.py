@@ -1,6 +1,8 @@
 import os
 import sqlite3
 import threading
+import hashlib
+import secrets
 from typing import Optional, List, Dict, Any
 import pandas as pd
 from datetime import datetime
@@ -39,7 +41,64 @@ def init_db():
                     Author TEXT,
                     [Program name] TEXT,
                     [VIN Number] TEXT,
-                    [Last Updated] TEXT
+                    [Last Updated] TEXT,
+                    Raw TEXT,
+                    Hex TEXT
+                )
+            """)
+            
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS saved_reports (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    title TEXT,
+                    type TEXT,
+                    content_markdown TEXT,
+                    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+                )
+            """)
+            # Migrate existing databases: add Raw, Hex, and AI Analysis columns if missing
+            try:
+                cursor.execute("ALTER TABLE diagnostics ADD COLUMN Raw TEXT")
+            except Exception:
+                pass  # Column already exists
+            try:
+                cursor.execute("ALTER TABLE diagnostics ADD COLUMN Hex TEXT")
+            except Exception:
+                pass  # Column already exists
+            try:
+                cursor.execute("ALTER TABLE saved_reports ADD COLUMN chart_data TEXT")
+            except sqlite3.OperationalError:
+                pass  # Column already exists
+            try:
+                cursor.execute("ALTER TABLE diagnostics ADD COLUMN [AI Analysis] TEXT")
+            except Exception:
+                pass  # Column already exists
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS users (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    name TEXT NOT NULL,
+                    username TEXT NOT NULL UNIQUE,
+                    email TEXT NOT NULL UNIQUE,
+                    password_hash TEXT NOT NULL,
+                    salt TEXT NOT NULL,
+                    created_at TEXT NOT NULL
+                )
+            """)
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS sessions (
+                    token TEXT PRIMARY KEY,
+                    user_id INTEGER NOT NULL,
+                    created_at TEXT NOT NULL,
+                    FOREIGN KEY(user_id) REFERENCES users(id)
+                )
+            """)
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS chat_sessions (
+                    id TEXT PRIMARY KEY,
+                    title TEXT NOT NULL,
+                    history_json TEXT NOT NULL,
+                    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
                 )
             """)
             conn.commit()
@@ -47,6 +106,110 @@ def init_db():
         except Exception as e:
             print(f"Error initializing DB: {e}")
             raise RuntimeError(f"Database initialization failed: {str(e)}")
+
+def hash_password(password: str, salt: Optional[str] = None) -> tuple:
+    if not salt:
+        salt = secrets.token_hex(16)
+    key = hashlib.pbkdf2_hmac('sha256', password.encode('utf-8'), salt.encode('utf-8'), 100000)
+    return key.hex(), salt
+
+def verify_password(password: str, password_hash: str, salt: str) -> bool:
+    calc_hash, _ = hash_password(password, salt)
+    return secrets.compare_digest(calc_hash, password_hash)
+
+def create_user(name: str, username: str, email: str, password: str) -> dict:
+    name = name.strip()
+    username = username.strip().lower()
+    email = email.strip().lower()
+    
+    if not name or not username or not email or not password:
+        raise ValueError("All fields (Name, username, email address, password) are required.")
+        
+    pwd_hash, salt = hash_password(password)
+    created_at = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    
+    with db_lock:
+        conn = get_connection()
+        cursor = conn.cursor()
+        cursor.execute("SELECT username, email FROM users WHERE username = ? OR email = ?", (username, email))
+        row = cursor.fetchone()
+        if row:
+            conn.close()
+            if row[0] == username:
+                raise ValueError("Username is already taken.")
+            else:
+                raise ValueError("Email address is already registered.")
+                
+        cursor.execute("""
+            INSERT INTO users (name, username, email, password_hash, salt, created_at)
+            VALUES (?, ?, ?, ?, ?, ?)
+        """, (name, username, email, pwd_hash, salt, created_at))
+        user_id = cursor.lastrowid
+        conn.commit()
+        conn.close()
+        
+    return {"id": user_id, "name": name, "username": username, "email": email}
+
+def authenticate_user(username_or_email: str, password: str) -> Optional[dict]:
+    identifier = username_or_email.strip().lower()
+    with db_lock:
+        conn = get_connection()
+        cursor = conn.cursor()
+        cursor.execute("""
+            SELECT id, name, username, email, password_hash, salt
+            FROM users
+            WHERE username = ? OR email = ?
+        """, (identifier, identifier))
+        row = cursor.fetchone()
+        conn.close()
+        
+    if not row:
+        return None
+        
+    user_id, name, username, email, password_hash, salt = row
+    if verify_password(password, password_hash, salt):
+        return {"id": user_id, "name": name, "username": username, "email": email}
+    return None
+
+def create_session(user_id: int) -> str:
+    token = secrets.token_hex(32)
+    created_at = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    with db_lock:
+        conn = get_connection()
+        cursor = conn.cursor()
+        cursor.execute("INSERT INTO sessions (token, user_id, created_at) VALUES (?, ?, ?)", (token, user_id, created_at))
+        conn.commit()
+        conn.close()
+    return token
+
+def get_user_by_token(token: str) -> Optional[dict]:
+    if not token:
+        return None
+    with db_lock:
+        conn = get_connection()
+        cursor = conn.cursor()
+        cursor.execute("""
+            SELECT u.id, u.name, u.username, u.email
+            FROM users u
+            JOIN sessions s ON u.id = s.user_id
+            WHERE s.token = ?
+        """, (token,))
+        row = cursor.fetchone()
+        conn.close()
+        
+    if row:
+        return {"id": row[0], "name": row[1], "username": row[2], "email": row[3]}
+    return None
+
+def delete_session(token: str):
+    if not token:
+        return
+    with db_lock:
+        conn = get_connection()
+        cursor = conn.cursor()
+        cursor.execute("DELETE FROM sessions WHERE token = ?", (token,))
+        conn.commit()
+        conn.close()
 
 def load_from_db() -> Optional[pd.DataFrame]:
     """Loads all diagnostics data from the database as a Pandas DataFrame."""
@@ -63,6 +226,9 @@ def load_from_db() -> Optional[pd.DataFrame]:
                 return None
             
             df = pd.read_sql_query("SELECT * FROM diagnostics", conn)
+            # Replace NaN/None with empty strings to prevent FastAPI JSON serialization errors
+            df = df.fillna("")
+            
             # Set the index column as the DataFrame index
             if "index" in df.columns:
                 df.set_index("index", inplace=True)
@@ -120,6 +286,29 @@ def update_row(index: int, comments: str, issue_status: str, author: str) -> Opt
             print(f"Error updating SQLite row {index}: {e}")
             raise RuntimeError(f"Database update failed: {str(e)}")
 
+def update_ai_analysis(index: int, analysis: str) -> bool:
+    """Saves the AI analysis report for a specific row index."""
+    with db_lock:
+        try:
+            conn = get_connection()
+            cursor = conn.cursor()
+            cursor.execute("SELECT 1 FROM diagnostics WHERE [index] = ?", (index,))
+            if not cursor.fetchone():
+                conn.close()
+                return False
+            
+            cursor.execute("""
+                UPDATE diagnostics
+                SET [AI Analysis] = ?
+                WHERE [index] = ?
+            """, (analysis, index))
+            conn.commit()
+            conn.close()
+            return True
+        except Exception as e:
+            print(f"Error updating AI Analysis for row {index}: {e}")
+            return False
+
 def merge_and_deduplicate(new_df: pd.DataFrame) -> pd.DataFrame:
     """Merges new dataframe rows into the existing database entries, avoiding duplicate key combinations."""
     existing_df = load_from_db()
@@ -158,3 +347,128 @@ def merge_and_deduplicate(new_df: pd.DataFrame) -> pd.DataFrame:
         return combined_df
     else:
         return existing_df
+
+
+# --- Saved Reports Operations ---
+
+def save_report(title: str, report_type: str, content_markdown: str, chart_data: str = None) -> int:
+    """Saves a generated report to the database."""
+    with db_lock:
+        conn = get_connection()
+        cursor = conn.cursor()
+        cursor.execute(
+            "INSERT INTO saved_reports (title, type, content_markdown, chart_data) VALUES (?, ?, ?, ?)",
+            (title, report_type, content_markdown, chart_data)
+        )
+        conn.commit()
+        report_id = cursor.lastrowid
+        conn.close()
+        return report_id
+
+def get_all_reports() -> List[Dict[str, Any]]:
+    """Retrieves all saved reports."""
+    conn = get_connection()
+    conn.row_factory = sqlite3.Row
+    cursor = conn.cursor()
+    cursor.execute("SELECT id, title, type, created_at FROM saved_reports ORDER BY created_at DESC")
+    rows = cursor.fetchall()
+    conn.close()
+    return [dict(row) for row in rows]
+
+def get_report_by_id(report_id: int) -> Optional[Dict[str, Any]]:
+    """Retrieves a specific report by its ID."""
+    conn = get_connection()
+    conn.row_factory = sqlite3.Row
+    cursor = conn.cursor()
+    cursor.execute("SELECT * FROM saved_reports WHERE id = ?", (report_id,))
+    row = cursor.fetchone()
+    conn.close()
+    if row:
+        return dict(row)
+    return None
+
+def delete_report(report_id: int) -> bool:
+    """Deletes a specific report by its ID."""
+    with db_lock:
+        conn = get_connection()
+        cursor = conn.cursor()
+        cursor.execute("DELETE FROM saved_reports WHERE id = ?", (report_id,))
+        rows_affected = cursor.rowcount
+        conn.commit()
+        conn.close()
+        return rows_affected > 0
+
+# --- Chat Sessions ---
+
+def get_all_chat_sessions() -> List[Dict[str, Any]]:
+    """Retrieves all chat sessions ordered by most recently updated."""
+    try:
+        conn = get_connection()
+        conn.row_factory = sqlite3.Row
+        cursor = conn.cursor()
+        cursor.execute("SELECT id, title, updated_at FROM chat_sessions ORDER BY updated_at DESC")
+        rows = cursor.fetchall()
+        conn.close()
+        return [dict(row) for row in rows]
+    except Exception as e:
+        print(f"Error fetching chat sessions: {e}")
+        return []
+
+def get_chat_session_db(session_id: str) -> Optional[Dict[str, Any]]:
+    """Retrieves a specific chat session."""
+    try:
+        conn = get_connection()
+        conn.row_factory = sqlite3.Row
+        cursor = conn.cursor()
+        cursor.execute("SELECT id, title, history_json, created_at, updated_at FROM chat_sessions WHERE id = ?", (session_id,))
+        row = cursor.fetchone()
+        conn.close()
+        if row:
+            return dict(row)
+        return None
+    except Exception as e:
+        print(f"Error fetching chat session {session_id}: {e}")
+        return None
+
+def save_chat_session_db(session_id: str, title: str, history_json: str):
+    """Inserts or updates a chat session."""
+    try:
+        with db_lock:
+            conn = get_connection()
+            cursor = conn.cursor()
+            cursor.execute("SELECT id FROM chat_sessions WHERE id = ?", (session_id,))
+            exists = cursor.fetchone()
+            
+            if exists:
+                cursor.execute("""
+                    UPDATE chat_sessions 
+                    SET title = ?, history_json = ?, updated_at = CURRENT_TIMESTAMP
+                    WHERE id = ?
+                """, (title, history_json, session_id))
+            else:
+                cursor.execute("""
+                    INSERT INTO chat_sessions (id, title, history_json) 
+                    VALUES (?, ?, ?)
+                """, (session_id, title, history_json))
+                
+            conn.commit()
+            conn.close()
+    except Exception as e:
+        print(f"Error saving chat session {session_id}: {e}")
+
+def delete_chat_session_db(session_id: str) -> bool:
+    """Deletes a chat session."""
+    try:
+        with db_lock:
+            conn = get_connection()
+            cursor = conn.cursor()
+            cursor.execute("DELETE FROM chat_sessions WHERE id = ?", (session_id,))
+            rows_affected = cursor.rowcount
+            conn.commit()
+            conn.close()
+            return rows_affected > 0
+    except Exception as e:
+        print(f"Error deleting chat session {session_id}: {e}")
+        return False
+
+

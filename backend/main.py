@@ -1,17 +1,43 @@
 import io
 import os
+import sys
 import threading
 from datetime import datetime
-from typing import Optional, List
-from fastapi import FastAPI, BackgroundTasks, HTTPException, Query
+
+if hasattr(sys.stdout, "reconfigure"):
+    try:
+        sys.stdout.reconfigure(encoding="utf-8")
+        sys.stderr.reconfigure(encoding="utf-8")
+    except Exception:
+        pass
+from typing import Optional, List, Dict, Any
+from fastapi import FastAPI, UploadFile, File, Form, BackgroundTasks, HTTPException, Header, Depends, Query, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 import pandas as pd
+import uuid
 
 from backend.parser import DiagnosticParser
-from backend.database import init_db, load_from_db, save_to_db, update_row, merge_and_deduplicate
+from backend.database import (
+    init_db, load_from_db, save_to_db, update_row, merge_and_deduplicate,
+    create_user, authenticate_user, create_session, get_user_by_token, delete_session, update_ai_analysis,
+    save_report, get_all_reports, get_report_by_id, delete_report, get_all_chat_sessions
+)
+from backend.rag_engine import (
+    ingest_knowledge_document, ingest_file_document, 
+    process_file_ingestion_background, get_rag_job_status
+)
+from backend.qdrant_service import get_all_knowledge_documents, set_qdrant_config, get_knowledge_chunks, delete_knowledge_chunk
+from backend.rca_engine import (
+    run_ai_rca_analysis, get_weekly_ai_summary,
+    list_available_log_files, run_per_file_quick_stats, run_ai_rca_analysis_for_file
+)
+from backend.log_analysis_engine import run_log_analysis
+from backend.chatbot_engine import process_chatbot_query, get_chat_session, clear_chat_session
+from backend.nvidia_client import get_nvidia_model, get_nvidia_embed_model, set_nvidia_ai_config
+from backend.knowledge_graph_engine import get_dtc_list, build_knowledge_graph, build_dynamic_graph
 
 app = FastAPI(title="Vehicle Diagnostics Parser Engine")
 API_VERSION = "2.0.0"
@@ -48,10 +74,53 @@ class UpdateRowRequest(BaseModel):
     index: int
     Comments: str
     Issue_Status: str
-    Author: str
+    Author: Optional[str] = None
+
+class SignUpRequest(BaseModel):
+    name: str
+    username: str
+    email: str
+    password: str
+
+class SignInRequest(BaseModel):
+    username_or_email: str
+    password: str
+
+class RAGIngestRequest(BaseModel):
+    title: str
+    category: str
+    content: str
+
+class ChatQueryRequest(BaseModel):
+    message: str
+    session_id: Optional[str] = None
+
+class SaveReportRequest(BaseModel):
+    title: str
+    type: str = "RCA"
+    content_markdown: str
+    chart_data: Optional[Dict[str, Any]] = None
+
+class AISettingsRequest(BaseModel):
+    nvidia_api_key: Optional[str] = None
+    nvidia_model: Optional[str] = None
+    nvidia_embed_model: Optional[str] = None
+    qdrant_url: Optional[str] = None
+    qdrant_api_key: Optional[str] = None
 
 # Initialize DB
 init_db()
+
+def get_current_user_from_header(authorization: Optional[str] = Header(None), x_auth_token: Optional[str] = Header(None)) -> Optional[dict]:
+    token = None
+    if isinstance(authorization, str) and authorization.startswith("Bearer "):
+        token = authorization.split("Bearer ")[1].strip()
+    elif isinstance(x_auth_token, str) and x_auth_token:
+        token = x_auth_token.strip()
+    
+    if not token:
+        return None
+    return get_user_by_token(token)
 
 def run_parsing_thread(folder_path: str):
     global state
@@ -61,14 +130,11 @@ def run_parsing_thread(folder_path: str):
         if not os.path.exists(folder_path):
             with state_lock:
                 state["status_logs"].append({
-                    "message": f"Path '{folder_path}' not found. Creating temporary server folder for ingestion simulation...",
+                    "message": f"Path '{folder_path}' not found. Creating folder...",
                     "level": "warning",
                     "time": datetime.now().strftime("%H:%M:%S")
                 })
             os.makedirs(folder_path, exist_ok=True)
-            for i in range(1, 11):
-                with open(os.path.join(folder_path, f"log_file_{i}.txt"), "w") as f:
-                    f.write("mock content")
 
         parser = DiagnosticParser(folder_path)
         
@@ -143,13 +209,55 @@ def get_data():
 def get_version():
     return {"version": API_VERSION}
 
-@app.post("/api/update-row")
-def update_row_endpoint(payload: UpdateRowRequest):
+@app.post("/api/signup")
+def signup(payload: SignUpRequest):
     try:
-        last_updated = update_row(payload.index, payload.Comments, payload.Issue_Status, payload.Author)
+        user = create_user(payload.name, payload.username, payload.email, payload.password)
+        token = create_session(user["id"])
+        return {"status": "success", "user": user, "token": token}
+    except ValueError as ve:
+        raise HTTPException(status_code=400, detail=str(ve))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Signup failed: {str(e)}")
+
+@app.post("/api/signin")
+def signin(payload: SignInRequest):
+    user = authenticate_user(payload.username_or_email, payload.password)
+    if not user:
+        raise HTTPException(status_code=401, detail="Invalid username/email or password.")
+    token = create_session(user["id"])
+    return {"status": "success", "user": user, "token": token}
+
+@app.post("/api/signout")
+def signout(authorization: Optional[str] = Header(None), x_auth_token: Optional[str] = Header(None)):
+    token = None
+    if isinstance(authorization, str) and authorization.startswith("Bearer "):
+        token = authorization.split("Bearer ")[1].strip()
+    elif isinstance(x_auth_token, str) and x_auth_token:
+        token = x_auth_token.strip()
+    if token:
+        delete_session(token)
+    return {"status": "success"}
+
+@app.get("/api/me")
+def get_me(authorization: Optional[str] = Header(None), x_auth_token: Optional[str] = Header(None)):
+    user = get_current_user_from_header(authorization, x_auth_token)
+    if not user:
+        raise HTTPException(status_code=401, detail="Not authenticated")
+    return {"user": user}
+
+@app.post("/api/update-row")
+def update_row_endpoint(payload: UpdateRowRequest, authorization: Optional[str] = Header(None), x_auth_token: Optional[str] = Header(None)):
+    user = get_current_user_from_header(authorization, x_auth_token)
+    if not user:
+        raise HTTPException(status_code=401, detail="Authentication required to edit diagnostic records.")
+    
+    author_name = user["name"]
+    try:
+        last_updated = update_row(payload.index, payload.Comments, payload.Issue_Status, author_name)
         if last_updated is None:
             raise HTTPException(status_code=400, detail=f"Failed to update row: index {payload.index} not found in database")
-        return {"status": "success", "last_updated": last_updated}
+        return {"status": "success", "last_updated": last_updated, "author": author_name}
     except Exception as e:
         if isinstance(e, HTTPException):
             raise e
@@ -229,10 +337,499 @@ def reset_state():
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Reset state failed: {str(e)}")
 
+@app.post("/api/rag/ingest")
+def rag_ingest_endpoint(payload: RAGIngestRequest):
+    try:
+        res = ingest_knowledge_document(payload.title, payload.category, payload.content)
+        return {"status": "success", "document": res}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Knowledge ingestion failed: {str(e)}")
+
+@app.post("/api/rag/upload-file")
+async def rag_upload_file_endpoint(
+    background_tasks: BackgroundTasks,
+    file: UploadFile = File(...),
+    category: str = Form("ECU Architecture")
+):
+    try:
+        content_bytes = await file.read()
+        if not content_bytes:
+            raise HTTPException(status_code=400, detail="Uploaded file is empty.")
+            
+        job_id = f"job_{uuid.uuid4().hex[:8]}"
+        background_tasks.add_task(
+            process_file_ingestion_background,
+            job_id,
+            file.filename,
+            content_bytes,
+            category
+        )
+        return {
+            "status": "started",
+            "job_id": job_id,
+            "message": f"Background chunking & embedding started for '{file.filename}'."
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to launch background ingestion: {str(e)}")
+
+@app.get("/api/rag/jobs/{job_id}")
+def get_rag_job_status_endpoint(job_id: str):
+    job_info = get_rag_job_status(job_id)
+    if not job_info:
+        raise HTTPException(status_code=404, detail="Job ID not found.")
+    return job_info
+
+
+@app.get("/api/rag/chunks")
+def rag_chunks_endpoint(category: Optional[str] = None, search: Optional[str] = None, page: int = 1, page_size: int = 20):
+    try:
+        data = get_knowledge_chunks(category, search, page, page_size)
+        return data
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to fetch chunks: {str(e)}")
+
+@app.delete("/api/rag/chunks/{chunk_id:path}")
+def delete_rag_chunk_endpoint(chunk_id: str):
+    try:
+        success = delete_knowledge_chunk(chunk_id)
+        if not success:
+            raise HTTPException(status_code=404, detail="Chunk not found or failed to delete")
+        return {"status": "success", "message": f"Chunk {chunk_id} deleted successfully"}
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to delete chunk: {str(e)}")
+
+@app.get("/api/rag/documents")
+def rag_documents_endpoint():
+    try:
+        docs = get_all_knowledge_documents()
+        return {"documents": docs}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to list RAG documents: {str(e)}")
+
+import asyncio
+from fastapi import Request
+
+@app.get("/api/ai/rca/files")
+def get_available_log_files():
+    try:
+        files = list_available_log_files()
+        return {"status": "success", "files": files}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to fetch log files: {str(e)}")
+
+@app.get("/api/ai/rca/quick-stats")
+def get_quick_stats():
+    try:
+        stats = run_per_file_quick_stats()
+        return stats
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to fetch quick stats: {str(e)}")
+
+@app.post("/api/ai/rca/file/{file_name}")
+async def ai_rca_file_endpoint(file_name: str, request: Request):
+    abort_event = threading.Event()
+    
+    # Run in a separate thread so we can poll for client disconnection
+    task = asyncio.create_task(asyncio.to_thread(run_ai_rca_analysis_for_file, file_name, "rca", abort_event))
+    
+    while not task.done():
+        if await request.is_disconnected():
+            abort_event.set()
+            task.cancel()
+            print(f"RCA Analysis for {file_name} cancelled by client disconnect")
+            raise HTTPException(status_code=499, detail="Client Closed Request")
+        await asyncio.sleep(0.5)
+        
+    try:
+        return task.result()
+    except Exception as e:
+        if "Cancelled" in str(e):
+            raise HTTPException(status_code=499, detail="Cancelled")
+        raise HTTPException(status_code=500, detail=f"AI RCA Analysis for {file_name} failed: {str(e)}")
+
+@app.post("/api/ai/rca")
+async def ai_rca_endpoint(request: Request):
+    abort_event = threading.Event()
+    
+    # Run in a separate thread so we can poll for client disconnection
+    task = asyncio.create_task(asyncio.to_thread(run_ai_rca_analysis, abort_event))
+    
+    while not task.done():
+        if await request.is_disconnected():
+            abort_event.set()
+            task.cancel()
+            print("RCA Analysis cancelled by client disconnect")
+            raise HTTPException(status_code=499, detail="Client Closed Request")
+        await asyncio.sleep(0.5)
+        
+    try:
+        return task.result()
+    except Exception as e:
+        if "Cancelled" in str(e):
+            raise HTTPException(status_code=499, detail="Cancelled")
+        raise HTTPException(status_code=500, detail=f"AI RCA Analysis failed: {str(e)}")
+
+@app.post("/api/analyze-log")
+async def api_analyze_log(row_data: dict, request: Request):
+    abort_event = threading.Event()
+    
+    task = asyncio.create_task(asyncio.to_thread(run_log_analysis, row_data, abort_event))
+    
+    while not task.done():
+        if await request.is_disconnected():
+            abort_event.set()
+            task.cancel()
+            print("Log analysis cancelled by client disconnect")
+            raise HTTPException(status_code=499, detail="Client Closed Request")
+        await asyncio.sleep(0.5)
+        
+    try:
+        result = task.result()
+        if result and result.get("status") == "success":
+            row_index_str = row_data.get("index")
+            if row_index_str is not None:
+                try:
+                    row_index = int(row_index_str)
+                    update_ai_analysis(row_index, result.get("report_markdown", ""))
+                except ValueError:
+                    pass
+            try:
+                row_id = row_data.get("index", "")
+                log_title = f"Single Log Context Analysis (Row #{row_id})"
+                save_report(log_title, "LOG", result.get("report_markdown", ""), None)
+            except Exception as e:
+                print(f"Failed to auto-save Log analysis report: {e}")
+        return result
+    except Exception as e:
+        if "Cancelled" in str(e):
+            raise HTTPException(status_code=499, detail="Cancelled")
+        raise HTTPException(status_code=500, detail=f"Log Analysis failed: {str(e)}")
+
+@app.get("/api/ai/weekly-summary")
+def ai_weekly_summary_endpoint():
+    try:
+        summary = get_weekly_ai_summary()
+        return summary
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"AI Weekly Summary failed: {str(e)}")
+
+@app.post("/api/ai/chat")
+def ai_chat_endpoint(payload: ChatQueryRequest):
+    try:
+        res = process_chatbot_query(payload.message, session_id=payload.session_id)
+        return res
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"AI Chatbot error: {str(e)}")
+
+class ChatSessionRequest(BaseModel):
+    session_id: str
+
+@app.post("/api/ai/chat/clear")
+def clear_chat_session_endpoint(payload: ChatSessionRequest):
+    """Clears conversation history for a given session."""
+    cleared = clear_chat_session(payload.session_id)
+    return {"status": "success", "cleared": cleared}
+
+@app.get("/api/ai/chat/sessions")
+def list_chat_sessions_endpoint():
+    """Lists all saved chat sessions."""
+    try:
+        sessions = get_all_chat_sessions()
+        return {"status": "success", "sessions": sessions}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to fetch chat sessions: {str(e)}")
+
+@app.delete("/api/ai/chat/sessions/{session_id}")
+def delete_chat_session_endpoint(session_id: str):
+    """Deletes a specific chat session."""
+    try:
+        cleared = clear_chat_session(session_id)
+        if not cleared:
+            raise HTTPException(status_code=404, detail="Session not found")
+        return {"status": "success", "deleted": True}
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to delete chat session: {str(e)}")
+
+@app.get("/api/ai/chat/history")
+def get_chat_history_endpoint(session_id: str = Query(...)):
+    """Returns conversation history for a given session."""
+    history = get_chat_session(session_id)
+    return {"status": "success", "session_id": session_id, "history": history}
+# --- Knowledge Graph API ---
+
+@app.get("/api/knowledge-graph/dtc-list")
+def kg_dtc_list_endpoint():
+    """Returns all unique DTC codes with metadata for the graph selector."""
+    try:
+        dtc_list = get_dtc_list()
+        return {"status": "success", "dtc_list": dtc_list}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to fetch DTC list: {str(e)}")
+
+@app.get("/api/knowledge-graph/explore")
+def kg_explore_graph_endpoint(entity_type: str = Query(...), entity_id: str = Query(...)):
+    """Builds a dynamic knowledge graph centered around a specific entity (module, vin, program)."""
+    try:
+        graph_data = build_dynamic_graph(entity_type, entity_id)
+        return graph_data
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to build dynamic knowledge graph: {str(e)}")
+
+
+@app.get("/api/knowledge-graph/{dtc_code}")
+def kg_build_graph_endpoint(dtc_code: str):
+    """Builds and returns the full knowledge graph for a specific DTC code."""
+    try:
+        graph_data = build_knowledge_graph(dtc_code)
+        return graph_data
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to build knowledge graph: {str(e)}")
+
+@app.get("/api/knowledge-graph/analysis/{dtc_code}")
+def kg_get_analysis_endpoint(dtc_code: str):
+    """Fetches existing AI log analysis reports for a given DTC code."""
+    try:
+        df = load_from_db()
+        if df is None or df.empty:
+            return {"status": "success", "reports": []}
+        
+        # Filter for the DTC code (case insensitive matching might be safer)
+        dtc_rows = df[df['Code'].astype(str).str.upper() == dtc_code.upper()]
+        
+        reports = []
+        for _, row in dtc_rows.iterrows():
+            ai_analysis = str(row.get('AI Analysis', ''))
+            if ai_analysis and ai_analysis.strip() and ai_analysis.lower() != 'nan':
+                # Build a summary title using module and date if available
+                module = row.get('Module', 'Unknown Module')
+                date_str = row.get('Last Updated', 'Unknown Date')
+                row_idx = row.get('index', 'N/A')
+                reports.append({
+                    "id": f"row_{row_idx}",
+                    "title": f"Log Analysis: {module} (Row #{row_idx})",
+                    "date": date_str,
+                    "markdown": ai_analysis
+                })
+        
+        # Optionally, check saved_reports table for reports with this DTC code in the title
+        try:
+            saved = get_all_reports()
+            for r in saved:
+                if dtc_code.upper() in r.get('title', '').upper():
+                    reports.append({
+                        "id": f"saved_{r['id']}",
+                        "title": r.get('title'),
+                        "date": r.get('created_at'),
+                        "markdown": r.get('content_markdown')
+                    })
+        except Exception:
+            pass # Ignore saved reports if error
+
+        return {"status": "success", "reports": reports}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to fetch analysis: {str(e)}")
+
+@app.post("/api/knowledge-graph/analyze/{dtc_code}")
+async def kg_analyze_dtc_endpoint(dtc_code: str, request: Request):
+    """Generates a new AI log analysis for the given DTC code on the fly."""
+    try:
+        df = load_from_db()
+        if df is None or df.empty:
+            raise HTTPException(status_code=404, detail="No diagnostic data available.")
+        
+        dtc_rows = df[df['Code'].astype(str).str.upper() == dtc_code.upper()]
+        if dtc_rows.empty:
+            raise HTTPException(status_code=404, detail=f"No logs found for DTC {dtc_code}.")
+        
+        # Grab the first matching row to analyze
+        row_series = dtc_rows.iloc[0]
+        # Convert all values to standard Python types, filling NaNs
+        row_data = {}
+        for k, v in row_series.items():
+            if pd.isna(v):
+                row_data[k] = ""
+            else:
+                row_data[k] = str(v)
+        
+        # Must ensure 'index' is present as an int for the update function
+        if 'index' in row_series and not pd.isna(row_series['index']):
+            row_data['index'] = int(row_series['index'])
+            
+        abort_event = threading.Event()
+        task = asyncio.create_task(asyncio.to_thread(run_log_analysis, row_data, abort_event))
+        
+        while not task.done():
+            if await request.is_disconnected():
+                abort_event.set()
+                task.cancel()
+                raise HTTPException(status_code=499, detail="Client Closed Request")
+            await asyncio.sleep(0.5)
+            
+        result = task.result()
+        if result and result.get("status") == "success":
+            # Update DB with the analysis
+            if 'index' in row_data:
+                update_ai_analysis(row_data['index'], result.get("report_markdown", ""))
+            return {"status": "success", "report": result.get("report_markdown", "")}
+        else:
+            raise HTTPException(status_code=500, detail="Log analysis failed to return success.")
+    except HTTPException:
+        raise
+    except Exception as e:
+        if "Cancelled" in str(e):
+            raise HTTPException(status_code=499, detail="Cancelled")
+        raise HTTPException(status_code=500, detail=f"Failed to run log analysis: {str(e)}")
+
+# --- Saved Reports API ---
+
+@app.get("/api/reports")
+def list_reports_endpoint():
+    try:
+        reports = get_all_reports()
+        return {"status": "success", "reports": reports}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to list reports: {str(e)}")
+
+@app.get("/api/reports/{report_id}")
+def get_report_endpoint(report_id: int):
+    try:
+        report = get_report_by_id(report_id)
+        if not report:
+            raise HTTPException(status_code=404, detail="Report not found")
+        return {"status": "success", "report": report}
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to get report: {str(e)}")
+
+import json
+
+@app.post("/api/reports")
+def create_report_endpoint(payload: SaveReportRequest):
+    try:
+        chart_data_str = json.dumps(payload.chart_data) if payload.chart_data else None
+        report_id = save_report(payload.title, payload.type, payload.content_markdown, chart_data_str)
+        return {"status": "success", "id": report_id, "message": "Report saved successfully."}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to save report: {str(e)}")
+
+@app.delete("/api/reports/{report_id}")
+def delete_report_endpoint(report_id: int):
+    try:
+        success = delete_report(report_id)
+        if not success:
+            raise HTTPException(status_code=404, detail="Report not found")
+        return {"status": "success", "message": "Report deleted successfully."}
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to delete report: {str(e)}")
+
+
+@app.get("/api/settings/ai")
+def get_ai_settings():
+    raw_nvidia_key = os.getenv("NVIDIA_API_KEY", "")
+    raw_qdrant_key = os.getenv("QDRANT_API_KEY", "")
+    
+    return {
+        "nvidia_model": get_nvidia_model(),
+        "nvidia_embed_model": get_nvidia_embed_model(),
+        "nvidia_api_key": raw_nvidia_key,
+        "nvidia_api_key_set": bool(raw_nvidia_key and not raw_nvidia_key.startswith("nvapi-your")),
+        "qdrant_url": os.getenv("QDRANT_URL", ""),
+        "qdrant_api_key": raw_qdrant_key,
+        "qdrant_api_key_set": bool(raw_qdrant_key and not raw_qdrant_key.startswith("your-"))
+    }
+
+@app.post("/api/settings/ai")
+def update_ai_settings(payload: AISettingsRequest):
+    try:
+        set_nvidia_ai_config(
+            api_key=payload.nvidia_api_key,
+            model_name=payload.nvidia_model,
+            embed_model=payload.nvidia_embed_model
+        )
+        set_qdrant_config(
+            url=payload.qdrant_url,
+            api_key=payload.qdrant_api_key
+        )
+        return {"status": "success", "message": "AI & Vector DB configuration updated successfully."}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to update AI settings: {str(e)}")
+
+@app.post("/api/settings/ai/test")
+def test_ai_settings(payload: AISettingsRequest):
+    import requests
+    from backend.nvidia_client import NVIDIA_BASE_URL
+    results = []
+
+    # 1. Test NVIDIA LLM
+    try:
+        if payload.nvidia_api_key and not payload.nvidia_api_key.startswith("nvapi-your"):
+            headers = {"Authorization": f"Bearer {payload.nvidia_api_key}", "Content-Type": "application/json"}
+            res = requests.post(f"{NVIDIA_BASE_URL}/chat/completions", headers=headers, json={
+                "model": payload.nvidia_model or "openai/gpt-oss-20b",
+                "messages": [{"role": "user", "content": "Test"}],
+                "max_tokens": 5
+            }, timeout=300)
+            if res.status_code == 200:
+                results.append("✅ NVIDIA LLM: Success")
+            else:
+                results.append(f"❌ NVIDIA LLM: {res.status_code}")
+        else:
+            results.append("⚠️ NVIDIA LLM: Key missing")
+    except Exception as e:
+        results.append(f"❌ NVIDIA LLM: {str(e)}")
+
+    # 2. Test NVIDIA Embed
+    try:
+        if payload.nvidia_api_key and not payload.nvidia_api_key.startswith("nvapi-your"):
+            headers = {"Authorization": f"Bearer {payload.nvidia_api_key}", "Content-Type": "application/json"}
+            res = requests.post(f"{NVIDIA_BASE_URL}/embeddings", headers=headers, json={
+                "input": ["test"],
+                "model": payload.nvidia_embed_model or "nvidia/nv-embedqa-e5-v5",
+                "input_type": "query"
+            }, timeout=30)
+            if res.status_code == 200:
+                results.append("✅ NVIDIA Embed: Success")
+            else:
+                results.append(f"❌ NVIDIA Embed: {res.status_code}")
+        else:
+            results.append("⚠️ NVIDIA Embed: Key missing")
+    except Exception as e:
+        results.append(f"❌ NVIDIA Embed: {str(e)}")
+
+    # 3. Test Qdrant
+    try:
+        if payload.qdrant_url and payload.qdrant_api_key and not payload.qdrant_api_key.startswith("your-"):
+            from qdrant_client import QdrantClient
+            client = QdrantClient(url=payload.qdrant_url, api_key=payload.qdrant_api_key, timeout=20.0)
+            client.get_collections()
+            results.append("✅ Qdrant DB: Success")
+        else:
+            results.append("⚠️ Qdrant DB: Missing URL/Key")
+    except Exception as e:
+        results.append(f"❌ Qdrant DB: {str(e)}")
+
+    return {"status": "success", "results": results}
+
+# Custom StaticFiles wrapper to prevent AssertionError on WebSocket scopes
+class SPAStaticFiles(StaticFiles):
+    async def __call__(self, scope, receive, send):
+        if scope["type"] != "http":
+            if scope["type"] == "websocket":
+                await send({"type": "websocket.close", "code": 1000})
+            return
+        await super().__call__(scope, receive, send)
+
 # Mount frontend files
 frontend_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "frontend")
 if os.path.exists(frontend_dir):
-    app.mount("/", StaticFiles(directory=frontend_dir, html=True), name="frontend")
+    app.mount("/", SPAStaticFiles(directory=frontend_dir, html=True), name="frontend")
 else:
     # Handle case where frontend folder is missing initially
     @app.get("/")

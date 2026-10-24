@@ -1,0 +1,41 @@
+Requirement_ID,Content
+REQ-1,The diagnostic system shall monitor ECU nodes over the CAN bus for Diagnostic Trouble Codes (DTCs).
+REQ-2,When any safety-critical fault is confirmed, the diagnostic system shall log the event timestamp to non-volatile memory.
+REQ-3,If the vehicle battery voltage drops below 9.0V, then the system shall suspend all diagnostic reporting until voltage is restored.
+REQ-4,When the ECM detects a misfire rate above 2% over a 200-revolution window on any cylinder, the ECM shall enter catalyst-protection mode.
+REQ-5,While in catalyst-protection mode, the ECM shall cut fuel to the affected cylinder.
+REQ-6,While in catalyst-protection mode, the ECM shall limit overall engine torque to 60% of normal output.
+REQ-7,If three consecutive clean drive cycles pass without the misfire recurring, then the ECM shall exit catalyst-protection mode and restore full torque.
+REQ-8,When catalyst efficiency drops below the predefined threshold, the ECM shall set the P0420 fault code.
+REQ-9,When the P0420 fault is set, the ECM shall turn on the check-engine light.
+REQ-10,When the P0420 fault is set, the ECM shall set the emissions-readiness status to "not ready".
+REQ-11,If the P0420 fault is set, then the ECM shall not limit engine performance.
+REQ-12,If one complete drive cycle finishes without the P0420 fault reappearing, then the ECM shall clear the "not ready" emissions status.
+REQ-13,When a lean fuel condition is detected, the ECM shall increase fuel trim up to a maximum of 25% additional fuel.
+REQ-14,If the lean condition persists beyond the 25% fuel trim compensation limit, then the ECM shall confirm the P0171 fault.
+REQ-15,When the P0171 fault is confirmed, the ECM shall turn on the check-engine light.
+REQ-16,When the P0171 fault is confirmed, the ECM shall capture and store the fuel pressure value at the moment of the fault.
+REQ-17,When an internal transmission problem occurs, the TCM shall store a specific sub-code representing the root cause.
+REQ-18,When the TCM confirms an internal transmission problem, the TCM shall force the transmission into 3rd gear within 0.5 seconds.
+REQ-19,When the P0700 fault is confirmed, the TCM shall request the check-engine light to turn on.
+REQ-20,When the P0700 fault is confirmed, the TCM shall broadcast the underlying sub-code on the diagnostic bus.
+REQ-21,When the ABS module confirms an internal fault, the ABS module shall disable ABS, electronic stability control, and traction control within 100 milliseconds.
+REQ-22,When the ABS module disables the control systems, the ABS module shall enable base (non-assisted) braking.
+REQ-23,When the ABS module confirms an internal fault, the ABS module shall notify the body control module to illuminate the ABS, stability-control, and brake warning lights.
+REQ-24,If a module on the network stops receiving engine-control data, then the module shall retain the last valid values for 2 seconds.
+REQ-25,If engine-control data communication is not restored within 2 seconds, then the module shall switch to pre-defined safe default values.
+REQ-26,While engine-control data is unavailable, the instrument cluster shall display dashes instead of numbers for engine data fields.
+REQ-27,When communication with the ABS module is lost, the system shall turn on the stability-control and traction-control availability indicator.
+REQ-28,Where an alternate speed measurement source is available, the system shall automatically switch to that source upon loss of ABS communication.
+REQ-29,When communication with the ABS module is lost, the system shall log the timestamp of the event for root-cause analysis.
+REQ-30,If the resistance in the driver airbag deployment circuit falls outside the range of 2.0 to 3.0 ohms, then the SRS module shall disable deployment for that airbag circuit.
+REQ-31,When the B0010 fault is confirmed, the SRS module shall turn on the airbag warning light.
+REQ-32,When the B0010 fault is confirmed, the SRS module shall permanently store the fault in non-volatile memory.
+REQ-33,If the vehicle is restarted, then the SRS module shall not automatically clear the B0010 fault.
+REQ-34,Where a diagnostic tool is connected and the underlying physical issue has been repaired, the SRS module shall allow clearing of the B0010 fault.
+REQ-35,When the BCM detects an abnormal supply voltage, the BCM shall shut off non-essential electrical features within one second.
+REQ-36,When the BCM shuts off non-essential electrical features, the BCM shall not request the check-engine light to turn on.
+REQ-37,When the BCM shuts off non-essential electrical features, the system shall alert the driver using an audible chime.
+REQ-38,When an abnormal supply voltage is detected, the BCM shall record the voltage behavior for the 5 seconds leading up to the fault.
+REQ-39,If overall vehicle voltage stays below 11.5 volts for more than 3 seconds, then the ECM shall reduce power to non-critical accessories.
+REQ-40,If a U0100 or U0121 fault occurs within 5 seconds of a P0562 fault, then the system shall flag the communication faults as related to the low voltage event.
